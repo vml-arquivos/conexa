@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  planType  String   @default("basic") // basic, pro, enterprise
+  students  Student[]
+  inventory Inventory[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Student {
+  id           String   @id @default(cuid())
+  name         String
+  classId      String
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  profileData  Json     // Dados acadêmicos: notas, grade curricular, etc
+  healthData   Json     // Dados de saúde: alergias, intolerâncias, medicamentos, etc
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+model Inventory {
+  id           String   @id @default(cuid())
+  item         String
+  category     String   // Higiene, Pedagógico, Alimentação
+  quantity     Int
+  minThreshold Int
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([category])
+}
