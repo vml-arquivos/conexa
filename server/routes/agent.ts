@@ -174,8 +174,8 @@ async function getSchoolStats(payload: any) {
     where: {
       schoolId,
     },
-  }).then(items => 
-    items.filter(item => item.quantity < item.minThreshold)
+  }).then((items: any) => 
+    items.filter((item: any) => item.quantity < item.minThreshold)
   );
 
   return {

@@ -25,6 +25,8 @@ services:
     environment:
       DATABASE_URL: "postgresql://admin:password@db:5432/conexa_db?schema=public"
       PORT: 3000
+    volumes:
+      - ./server/uploads:/app/uploads
     depends_on:
       - db
     networks:
@@ -45,6 +47,7 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
 
 networks:
   conexa-net:
