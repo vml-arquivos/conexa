@@ -1,19 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, AlertTriangle, Heart } from "lucide-react";
+import { Plus, Search, AlertTriangle, Heart, Loader2 } from "lucide-react";
 import { Link } from "wouter";
-import { ALUNOS } from "@/data/mockData";
+
+interface Student {
+  id: string;
+  name: string;
+  classId?: string;
+  healthData?: {
+    alergias?: string[];
+    medicamentos?: string[];
+    tea?: boolean;
+  };
+  attendance?: {
+    faltasConsecutivas?: number;
+    total?: number;
+  };
+}
 
 export default function AlunosList() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [alunos, setAlunos] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredAlunos = ALUNOS.filter(aluno =>
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/students");
+        if (!response.ok) throw new Error("Erro ao buscar alunos");
+        const data = await response.json();
+        setAlunos(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro desconhecido");
+        setAlunos([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
+
+  const filteredAlunos = alunos.filter(aluno =>
     aluno.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    aluno.turma.toLowerCase().includes(searchTerm.toLowerCase())
+    aluno.classId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -40,10 +85,21 @@ export default function AlunosList() {
         />
       </div>
 
+      {error && (
+        <Card className="border-red-200 bg-red-50/30">
+          <CardContent className="pt-6">
+            <p className="text-red-700">⚠️ {error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredAlunos.map((aluno) => {
-          const isRiscoEvasao = aluno.faltasConsecutivas > 30;
-          const temProblemasSaude = aluno.saude.length > 0;
+          const faltasConsecutivas = aluno.attendance?.faltasConsecutivas || 0;
+          const faltasTotal = aluno.attendance?.total || 0;
+          const isRiscoEvasao = faltasConsecutivas > 30;
+          const temProblemasSaude = (aluno.healthData?.alergias?.length || 0) > 0 || 
+                                     (aluno.healthData?.medicamentos?.length || 0) > 0;
 
           return (
             <Card
@@ -62,15 +118,15 @@ export default function AlunosList() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1">
-                    <img
-                      src={aluno.foto}
-                      alt={aluno.name}
-                      className="w-10 h-10 rounded-full"
-                    />
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-sm font-semibold text-primary">
+                        {aluno.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
                     <div>
                       <CardTitle className="text-base">{aluno.name}</CardTitle>
                       <CardDescription className="text-xs">
-                        {aluno.turma}
+                        {aluno.classId || "Sem turma"}
                       </CardDescription>
                     </div>
                   </div>
@@ -87,11 +143,11 @@ export default function AlunosList() {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <p className="text-muted-foreground text-xs">Faltas Consecutivas</p>
-                    <p className="font-semibold text-lg">{aluno.faltasConsecutivas}</p>
+                    <p className="font-semibold text-lg">{faltasConsecutivas}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">Faltas Totais</p>
-                    <p className="font-semibold text-lg">{aluno.faltasTotal}</p>
+                    <p className="font-semibold text-lg">{faltasTotal}</p>
                   </div>
                 </div>
 
@@ -102,13 +158,22 @@ export default function AlunosList() {
                       Informações de Saúde
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {aluno.saude.map((info, idx) => (
+                      {aluno.healthData?.alergias?.map((alergia, idx) => (
                         <Badge
-                          key={idx}
+                          key={`alergia-${idx}`}
                           variant="secondary"
                           className="bg-yellow-100/80 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200 text-xs"
                         >
-                          {info}
+                          {alergia}
+                        </Badge>
+                      ))}
+                      {aluno.healthData?.medicamentos?.map((med, idx) => (
+                        <Badge
+                          key={`med-${idx}`}
+                          variant="secondary"
+                          className="bg-orange-100/80 text-orange-900 dark:bg-orange-900/30 dark:text-orange-200 text-xs"
+                        >
+                          {med}
                         </Badge>
                       ))}
                     </div>
@@ -132,10 +197,12 @@ export default function AlunosList() {
         })}
       </div>
 
-      {filteredAlunos.length === 0 && (
+      {filteredAlunos.length === 0 && !error && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">Nenhum aluno encontrado</p>
+            <p className="text-muted-foreground">
+              {alunos.length === 0 ? "Nenhum aluno cadastrado" : "Nenhum aluno encontrado"}
+            </p>
           </CardContent>
         </Card>
       )}

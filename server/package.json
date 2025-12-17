@@ -7,7 +7,11 @@
     "start": "node dist/index.js",
     "dev": "ts-node-dev src/index.ts",
     "prisma:generate": "prisma generate --schema=../prisma/schema.prisma",
-    "prisma:push": "prisma db push --schema=../prisma/schema.prisma"
+    "prisma:push": "prisma db push --schema=../prisma/schema.prisma",
+    "prisma:seed": "ts-node --project ./tsconfig.json ../prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node --project ./tsconfig.json ../prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
@@ -23,6 +27,7 @@
     "@types/morgan": "^1.9.0",
     "@types/node": "^20.0.0",
     "prisma": "^5.0.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"
   }
