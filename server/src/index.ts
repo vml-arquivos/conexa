@@ -4,9 +4,11 @@ import morgan from 'morgan';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import agentRoutes from '../routes/agent.js';
-import employeeRoutes from '../routes/employees.js';
+import employeeRoutes from '../routes/employees-advanced.js';
 import documentRoutes from '../routes/documents.js';
 import procurementRoutes from '../routes/procurement.js';
+import materialOrderRoutes from '../routes/material-orders.js';
+import studentRoutes from '../routes/students-advanced.js';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -34,6 +36,12 @@ app.use('/api/documents', documentRoutes);
 
 // Rotas de Compras
 app.use('/api/procurement', procurementRoutes);
+
+// Rotas de Alunos Avançadas
+app.use('/api/students', studentRoutes);
+
+// Rotas de Pedidos por Turma
+app.use('/api/material-orders', materialOrderRoutes);
 
 // Rota de Alunos
 app.get('/api/students', async (req, res) => {

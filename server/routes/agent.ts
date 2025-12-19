@@ -154,7 +154,7 @@ router.post('/command', async (req: Request, res: Response) => {
         const inventory = await prisma.inventoryItem.findMany({
           where: { schoolId: payload.schoolId }
         });
-        const totalInventoryValue = inventory.reduce((sum, item) => 
+        const totalInventoryValue = inventory.reduce((sum: number, item: any) => 
           sum + (Number(item.lastPrice) * item.quantity), 0
         );
 

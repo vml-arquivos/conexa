@@ -8,7 +8,7 @@ export default function Navbar() {
         <Link href="/">
           <a className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                 <span class="text-primary-foreground font-bold font-display text-xl">C</span>>
+              <span className="text-primary-foreground font-bold font-display text-xl">C</span>
             </div>
             <span className="font-display font-bold text-xl tracking-tight text-foreground">CONEXA</span>
           </a>

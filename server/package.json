@@ -1,10 +1,11 @@
 {
   "name": "conexa-server",
   "version": "1.0.0",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "npm run mkdir:uploads && tsc",
-    "start": "npm run mkdir:uploads && node dist/index.js",
+    "start": "npm run mkdir:uploads && node dist/src/index.js",
     "dev": "npm run mkdir:uploads && ts-node-dev src/index.ts",
     "prisma:generate": "prisma generate --schema=../prisma/schema.prisma",
     "mkdir:uploads": "mkdir -p ./uploads",
