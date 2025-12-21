@@ -15,7 +15,7 @@ const steps = [
   {
     icon: <Brain className="w-6 h-6" />,
     title: "Análise IA",
-    desc: "AuraMind valida BNCC"
+    desc: "CONEXA AI valida BNCC"
   },
   {
     icon: <Mail className="w-6 h-6" />,
@@ -92,7 +92,7 @@ export default function AutomationFlow() {
                       <Brain className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm">Análise AuraMind</h4>
+                      <h4 className="font-bold text-sm">Análise CONEXA AI</h4>
                       <p className="text-xs text-gray-500">Processado agora</p>
                     </div>
                   </div>

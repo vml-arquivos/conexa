@@ -17,7 +17,7 @@ const features = [
   {
     icon: <BrainCircuit className="w-8 h-8 text-primary" />,
     title: "Inteligência Artificial",
-    description: "O AuraMind analisa planejamentos em tempo real, garantindo alinhamento à BNCC e qualidade pedagógica antes da revisão humana.",
+    description: "O CONEXA AI analisa planejamentos em tempo real, garantindo alinhamento à BNCC e qualidade pedagógica antes da revisão humana.",
     items: ["Análise BNCC", "Score de Qualidade", "Sugestões Automáticas"]
   }
 ];

@@ -20,7 +20,7 @@ export default function NovoPlanejamento() {
     setTimeout(() => {
       setIsAnalyzing(false);
       setAiSuggestion("Com base na BNCC (EF05HI02), sugiro incluir uma atividade prática sobre a cultura indígena local para enriquecer o tópico 'Período Colonial'.");
-      toast.success("Análise AuraMind concluída!");
+      toast.success("Análise CONEXA AI concluída!");
     }, 2000);
   };
 
@@ -107,7 +107,7 @@ export default function NovoPlanejamento() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
                 <Sparkles className="w-5 h-5" />
-                AuraMind AI
+                CONEXA AI AI
               </CardTitle>
               <CardDescription>
                 Seu assistente pedagógico inteligente.

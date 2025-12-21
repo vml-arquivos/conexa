@@ -30,11 +30,11 @@ export default function Login() {
       <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-primary-foreground font-bold font-display text-2xl">C</span>
+            <span className="text-primary-foreground font-bold font-display text-2xl">A</span>
           </div>
           <CardTitle className="text-2xl font-display font-bold">Bem-vindo ao CONEXA</CardTitle>
           <CardDescription>
-            Sua Conexão Pedagógica Inteligente
+            Entre com suas credenciais para acessar o sistema
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>

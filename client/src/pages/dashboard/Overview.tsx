@@ -20,7 +20,7 @@ export default function Overview() {
 
   const recentActivity = [
     { user: "Carlos Eduardo", action: "submeteu planejamento", target: "Matemática 5º Ano", time: "2 min atrás", status: "pending" },
-    { user: "AuraMind AI", action: "aprovou automaticamente", target: "História 3º Ano", time: "15 min atrás", status: "approved" },
+    { user: "CONEXA AI AI", action: "aprovou automaticamente", target: "História 3º Ano", time: "15 min atrás", status: "approved" },
     { user: "Mariana Costa", action: "editou tarefa", target: "Feira de Ciências", time: "1h atrás", status: "neutral" },
   ];
 
@@ -91,7 +91,7 @@ export default function Overview() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-              Insights AuraMind
+              Insights CONEXA AI
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

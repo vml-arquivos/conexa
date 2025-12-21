@@ -8,13 +8,10 @@ export default function Footer() {
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold font-display text-xl">C</span>
+                <span className="text-primary-foreground font-bold font-display text-xl">A</span>
               </div>
               <span className="font-display font-bold text-xl tracking-tight text-foreground">CONEXA</span>
             </div>
-            <p className="text-muted-foreground max-w-md mb-2 font-semibold">
-              Sua Conexão Pedagógica Inteligente
-            </p>
             <p className="text-muted-foreground max-w-md mb-6">
               Sistema Integrado de Gestão Educacional que une IA, automação e design para transformar escolas.
             </p>
@@ -30,7 +27,7 @@ export default function Footer() {
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><a href="#" className="hover:text-primary">Pedagógico</a></li>
               <li><a href="#" className="hover:text-primary">Administrativo</a></li>
-              <li><a href="#" className="hover:text-primary">AuraMind AI</a></li>
+              <li><a href="#" className="hover:text-primary">CONEXA AI AI</a></li>
               <li><a href="#" className="hover:text-primary">Preços</a></li>
             </ul>
           </div>
