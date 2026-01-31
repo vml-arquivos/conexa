@@ -227,11 +227,15 @@ JWT_SECRET=$(openssl rand -base64 32)
 SESSION_SECRET=$(openssl rand -base64 32)
 DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
 
-# Update .env file
-sed -i "s/JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET/" .env
-sed -i "s/SESSION_SECRET=.*/SESSION_SECRET=$SESSION_SECRET/" .env
-sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$DB_PASSWORD/" .env
-sed -i "s/:conexa_secure_password_2026_CHANGE_ME@/:$DB_PASSWORD@/" .env
+# Update .env file (escape special characters for sed)
+JWT_SECRET_ESCAPED=$(echo "$JWT_SECRET" | sed 's/[&/\]/\\&/g')
+SESSION_SECRET_ESCAPED=$(echo "$SESSION_SECRET" | sed 's/[&/\]/\\&/g')
+DB_PASSWORD_ESCAPED=$(echo "$DB_PASSWORD" | sed 's/[&/\]/\\&/g')
+
+sed -i "s/JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET_ESCAPED/" .env
+sed -i "s/SESSION_SECRET=.*/SESSION_SECRET=$SESSION_SECRET_ESCAPED/" .env
+sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$DB_PASSWORD_ESCAPED/" .env
+sed -i "s/:conexa_secure_password_2026_CHANGE_ME@/:$DB_PASSWORD_ESCAPED@/" .env
 
 print_success "Senhas geradas e configuradas!"
 
