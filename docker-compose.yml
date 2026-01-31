@@ -5,49 +5,80 @@ services:
   db:
     image: postgres:15-alpine
     container_name: conexa_db
+    restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: conexa_db
+      POSTGRES_USER: ${POSTGRES_USER:-conexa_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-conexa_secure_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-conexa_prod}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-conexa_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - conexa-net
 
   # Backend API
   backend:
-    build: ./server
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     container_name: conexa_api
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: "postgresql://admin:password@db:5432/conexa_db?schema=public"
-      PORT: 3000
-    volumes:
-      - ./server/uploads:/app/uploads
+    restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-conexa_admin}:${POSTGRES_PASSWORD:-conexa_secure_password_2026}@db:5432/${POSTGRES_DB:-conexa_prod}?schema=public
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - conexa-net
 
   # Frontend (Nginx)
   frontend:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: conexa_web
-    ports:
-      - "80:80"
+    restart: always
     depends_on:
       - backend
+    environment:
+      VITE_API_URL: ${API_URL:-http://localhost:3001}
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - conexa-net
 
 volumes:
-  postgres_data:
-  uploads_data:
+  pgdata:
+    driver: local
 
 networks:
   conexa-net:
