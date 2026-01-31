@@ -1,7 +1,7 @@
 // ========================================
-// SISTEMA CONEXA v1.0
-// Schema Prisma Final - Produção
-// "Conectando Vidas"
+// SISTEMA VALENTE v1.0 (formerly CONEXA)
+// Schema Prisma Completo - Produção
+// "Conectando Vidas com Dignidade"
 // ========================================
 
 generator client {
@@ -17,28 +17,36 @@ datasource db {
 // ENUMS
 // ========================================
 
-enum Role {
+// ALIAS: Role mantido para compatibilidade, mas UserRole é o principal
+enum UserRole {
   MATRIZ_ADMIN      // Poder total sobre todas as unidades
+  MATRIZ_COORD      // Coordenador da matriz
   MATRIZ_NUTRI      // Nutricionista da rede (cardápios globais)
   MATRIZ_PSYCHO     // Psicóloga (acesso a prontuários sigilosos)
   UNIT_DIRECTOR     // Diretor da unidade (gestão local)
+  UNIT_COORD        // Coordenador da unidade
   UNIT_SECRETARY    // Secretária (operacional)
+  UNIT_NUTRI        // Nutricionista da unidade
   TEACHER           // Professor (acesso restrito à sua turma)
+  SUPPORT_STAFF     // Equipe de apoio
 }
 
 enum InventoryCategory {
-  ALIMENTO          // Alimentos em geral
-  HIGIENE           // Produtos de higiene (fraldas, sabonete)
-  LIMPEZA           // Produtos de limpeza
-  PEDAGOGICO        // Materiais pedagógicos
-  MEDICAMENTO       // Medicamentos básicos
+  FOOD              // Alimentos em geral
+  HYGIENE           // Produtos de higiene (fraldas, sabonete)
+  CLEANING          // Produtos de limpeza
+  PEDAGOGICAL       // Materiais pedagógicos
+  OFFICE            // Material de escritório
+  UTILITY           // Utilidades
+  MEDICINE          // Medicamentos básicos
+  DIGNITY_CRITICAL  // Itens críticos de dignidade
 }
 
 enum StockAlertLevel {
-  OK                // Estoque normal
+  NONE              // Estoque normal
   LOW               // Baixo (< 7 dias)
   CRITICAL          // Crítico (< 3 dias)
-  EMERGENCY         // Emergência (< 1 dia)
+  EXCESS            // Excesso
 }
 
 enum FoodAcceptance {
@@ -60,8 +68,29 @@ enum Mood {
   CALMO             // Calmo
 }
 
+enum DocumentType {
+  RG
+  CPF
+  BIRTH_CERTIFICATE
+  VACCINATION_CARD
+  RESIDENCE_PROOF
+  MEDICAL_REPORT
+  TRANSFER_LETTER
+  OTHER
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
 // ========================================
-// 1. HIERARQUIA (RBAC)
+// 1. HIERARQUIA (RBAC) & MULTI-TENANCY
 // ========================================
 
 model Association {
@@ -96,11 +125,14 @@ model School {
   
   // Relacionamentos
   users           User[]
+  employees       Employee[]
   classes         Class[]
   students        Student[]
   inventoryItems  InventoryItem[]
   menus           Menu[]
   consumptionLogs ConsumptionLog[]
+  procurementOrders ProcurementOrder[]
+  auditLogs       AuditLog[]
   
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -112,11 +144,12 @@ model School {
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
-  passwordHash  String
+  password      String   // Para compatibilidade com código existente
+  passwordHash  String?  // Hash bcrypt (migração gradual)
   name          String
   cpf           String?  @unique
   phone         String?
-  role          Role
+  role          UserRole
   
   // Multi-tenancy: Usuários de UNIDADE/TEACHER têm schoolId
   schoolId      String?
@@ -128,6 +161,7 @@ model User {
   
   // Relacionamentos
   psychologicalRecords PsychologicalRecord[]
+  auditLogs     AuditLog[]
   
   // Auditoria
   lastLogin     DateTime?
@@ -140,22 +174,74 @@ model User {
 }
 
 // ========================================
-// 2. MÓDULO "ZELO" (ESTOQUE & NUTRIÇÃO)
+// 2. GESTÃO DE PESSOAS (RH)
+// ========================================
+
+model Employee {
+  id          String   @id @default(uuid())
+  name        String
+  cpf         String?  @unique
+  email       String?
+  phone       String?
+  role        UserRole
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  documents   Document[]
+  
+  hireDate    DateTime?
+  active      Boolean  @default(true)
+  salary      Float?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("employees")
+}
+
+model Document {
+  id          String       @id @default(uuid())
+  title       String
+  type        DocumentType
+  url         String
+  fileKey     String?
+  
+  studentId   String?
+  student     Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  employeeId  String?
+  employee    Employee?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  expiryDate  DateTime?
+  verified    Boolean      @default(false)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@map("documents")
+}
+
+// ========================================
+// 3. MÓDULO "ZELO" (ESTOQUE & NUTRIÇÃO)
 // ========================================
 
 model InventoryItem {
   id                    String              @id @default(uuid())
   name                  String              // "Fralda P"
+  sku                   String?             // Código SKU
   category              InventoryCategory
   quantity              Float               // Quantidade atual
   unit                  String              // "unidade", "kg", "litro"
   minThreshold          Float               // Alerta quando < minThreshold
   
-  // Previsão de estoque
-  avgDailyConsumption   Float?              // Consumo médio diário
-  daysRemaining         Int?                // Dias restantes
-  alertLevel            StockAlertLevel     @default(OK)
+  // Previsão de estoque (Zelo AI)
+  avgDailyConsumption   Float               @default(0)
+  daysRemaining         Float               @default(0)
+  alertLevel            StockAlertLevel     @default(NONE)
   lastAlertSent         DateTime?
+  lastPrice             Float?
+  lastUpdated           DateTime?
   
   // Multi-tenancy
   schoolId              String
@@ -174,6 +260,7 @@ model ConsumptionLog {
   id          String        @id @default(uuid())
   quantity    Float         // Quantidade consumida
   reason      String?       // Motivo (opcional)
+  userId      String?       // Quem registrou
   
   // Relacionamentos
   itemId      String
@@ -185,23 +272,97 @@ model ConsumptionLog {
   classId     String?
   class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
   
+  date        DateTime      @default(now())
   createdAt   DateTime      @default(now())
   
   @@map("consumption_logs")
 }
 
+model ProcurementOrder {
+  id          String      @id @default(uuid())
+  schoolId    String
+  school      School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  status      OrderStatus @default(DRAFT)
+  totalValue  Float?
+  
+  items       ProcurementOrderItem[]
+  
+  requestedBy String?
+  approvedBy  String?
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@map("procurement_orders")
+}
+
+model ProcurementOrderItem {
+  id          String           @id @default(uuid())
+  orderId     String
+  order       ProcurementOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name        String
+  quantity    Float
+  unitPrice   Float?
+  totalPrice  Float?
+  sku         String?
+  
+  @@map("procurement_order_items")
+}
+
+model Supplier {
+  id          String            @id @default(uuid())
+  name        String
+  cnpj        String?
+  email       String?
+  phone       String?
+  products    SupplierProduct[]
+  priceLists  SupplierPriceList[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  @@map("suppliers")
+}
+
+model SupplierProduct {
+  id          String   @id @default(uuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name        String
+  sku         String?
+  price       Float
+  unit        String
+  updatedAt   DateTime @updatedAt
+  
+  @@map("supplier_products")
+}
+
+model SupplierPriceList {
+  id          String   @id @default(uuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name        String
+  validUntil  DateTime?
+  fileUrl     String?
+  createdAt   DateTime @default(now())
+  
+  @@map("supplier_price_lists")
+}
+
 model Menu {
   id              String       @id @default(uuid())
   name            String       // "Cardápio Semana 1"
-  weekNumber      Int          // Número da semana
-  year            Int
+  title           String?      // Título alternativo
+  weekNumber      Int?         // Número da semana
+  year            Int?
+  date            DateTime?    // Data específica
   
   // JSON com estrutura:
   // {
   //   "monday": { "breakfast": "...", "lunch": "...", "snack": "..." },
   //   "tuesday": { ... }
   // }
-  meals           Json
+  meals           Json?
+  items           Json?        // Formato alternativo
   
   // Cardápio global (MATRIZ) ou local (SCHOOL)
   associationId   String?
@@ -218,14 +379,15 @@ model Menu {
 }
 
 // ========================================
-// 3. MÓDULO "SUPER PEDAGOGO" & IA
+// 4. MÓDULO "SUPER PEDAGOGO" & IA
 // ========================================
 
 model Class {
   id              String   @id @default(uuid())
   name            String   // "Berçário 1"
-  level           String   // "0-1 anos", "2-3 anos", "4 anos"
-  capacity        Int      // Capacidade máxima
+  level           String?  // "0-1 anos", "2-3 anos", "4 anos"
+  year            Int      @default(2025)
+  capacity        Int?     // Capacidade máxima
   
   // Multi-tenancy
   schoolId        String
@@ -233,10 +395,11 @@ model Class {
   
   // Relacionamentos
   students        Student[]
-  users           User[]   // Professores
+  teachers        User[]   // Professores
   dailyLogs       DailyLog[]
   bnccPlannings   BNCCPlanning[]
   consumptionLogs ConsumptionLog[]
+  materialLists   MaterialList[]
   
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -250,6 +413,7 @@ model Student {
   name                    String
   birthDate               DateTime
   cpf                     String?                 @unique
+  enrollmentId            String?
   
   // Dados de saúde (JSON)
   // { "allergies": ["lactose", "gluten"], "medications": ["..."] }
@@ -257,7 +421,10 @@ model Student {
   
   // Responsáveis (JSON)
   // [{ "name": "...", "phone": "...", "relationship": "mãe" }]
-  guardians               Json
+  guardians               Json?
+  
+  // Dados de perfil adicionais
+  profileData             Json?
   
   // Multi-tenancy
   schoolId                String
@@ -269,6 +436,7 @@ model Student {
   // Relacionamentos
   dailyLogs               DailyLog[]
   psychologicalRecords    PsychologicalRecord[]
+  documents               Document[]
   
   status                  String                  @default("ACTIVE") // ACTIVE, INACTIVE, TRANSFERRED
   createdAt               DateTime                @default(now())
@@ -286,10 +454,13 @@ model DailyLog {
   morningSnack    FoodAcceptance?
   lunch           FoodAcceptance?
   afternoonSnack  FoodAcceptance?
+  foodAcceptance  String?         // Formato alternativo
   
   // Sono
   slept           Boolean?
+  sleep           Boolean?        // Alias
   sleepDuration   Int?            // Minutos
+  sleepTime       String?         // Formato texto
   sleepQuality    SleepQuality?
   
   // Higiene
@@ -306,6 +477,7 @@ model DailyLog {
   
   // Observações
   observations    String?
+  notes           String?         // Alias
   
   // Alertas gerados pela IA (JSON)
   alerts          Json?
@@ -328,6 +500,7 @@ model PsychologicalRecord {
   date            DateTime @default(now())
   observation     String   @db.Text
   isConfidential  Boolean  @default(true)
+  tags            String[] @default([])
   
   // Relacionamentos
   studentId       String
@@ -346,15 +519,18 @@ model BNCCPlanning {
   id          String   @id @default(uuid())
   date        DateTime
   title       String
-  description String   @db.Text
+  theme       String?
+  description String?  @db.Text
+  activities  String?  @db.Text
   
   // Códigos BNCC (Array de strings)
-  // Ex: ["CE01", "CE02"]
+  // Ex: ["EI02TS01", "EI02EF01"]
   bnccCodes   String[]
   
   // Materiais necessários (JSON)
   // [{ "name": "Papel A4", "quantity": 20 }]
   materials   Json?
+  resources   String?
   
   // Duração (minutos)
   duration    Int?
@@ -373,3 +549,44 @@ model BNCCPlanning {
   @@map("bncc_plannings")
 }
 
+model MaterialList {
+  id          String             @id @default(uuid())
+  classId     String
+  class       Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name        String
+  items       MaterialListItem[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  
+  @@map("material_lists")
+}
+
+model MaterialListItem {
+  id             String       @id @default(uuid())
+  listId         String
+  materialList   MaterialList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name           String
+  quantity       Float
+  unit           String
+  purchased      Boolean      @default(false)
+  
+  @@map("material_list_items")
+}
+
+// ========================================
+// 5. AUDITORIA & COMPLIANCE
+// ========================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  resource    String
+  details     String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  schoolId    String?
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  
+  @@map("audit_logs")
+}
