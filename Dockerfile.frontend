@@ -2,6 +2,7 @@
 FROM node:18-alpine as builder
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches/
 RUN npm install -g pnpm && pnpm install
 COPY . .
 # Renomeia .env de prod se existir

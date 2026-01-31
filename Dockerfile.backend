@@ -24,6 +24,7 @@ FROM base AS dependencies
 
 # Copiar package files
 COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches/
 COPY prisma ./prisma/
 
 # Instalar dependências com pnpm
