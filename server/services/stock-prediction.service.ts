@@ -1,18 +1,28 @@
-// ========================================
-// SISTEMA CONEXA v1.0
-// Serviço: Previsão de Estoque (Módulo ZELO)
-// "Conectando Vidas"
-// ========================================
-
-import { PrismaClient, InventoryItem, StockAlertLevel, InventoryCategory } from '@prisma/client';
+import { PrismaClient, InventoryCategory, StockAlertLevel, InventoryItem } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// ========================================
-// TIPOS E INTERFACES
-// ========================================
+// Constants based on consumption patterns
+const CONSUMPTION_PATTERNS: Record<InventoryCategory, number> = {
+  [InventoryCategory.FOOD]: 0.15,        // High consumption
+  [InventoryCategory.HYGIENE]: 0.10,     // Moderate
+  [InventoryCategory.CLEANING]: 0.08,    // Steady
+  [InventoryCategory.PEDAGOGICAL]: 0.02, // Low
+  [InventoryCategory.MEDICINE]: 0.01,    // Occasional
+  [InventoryCategory.DIGNITY_CRITICAL]: 0.20, // Very High priority
+  // Fix: Added missing keys to satisfy TypeScript Record type
+  [InventoryCategory.OFFICE]: 0.03,
+  [InventoryCategory.UTILITY]: 0.05
+};
 
-interface StockPrediction {
+// Thresholds for alert levels (days remaining)
+const ALERT_THRESHOLDS = {
+  CRITICAL: 5,  // Less than 5 days
+  LOW: 15,      // Less than 15 days
+  WARNING: 30   // Less than 30 days
+};
+
+export interface StockPrediction {
   itemId: string;
   itemName: string;
   category: InventoryCategory;
@@ -21,392 +31,97 @@ interface StockPrediction {
   daysRemaining: number;
   alertLevel: StockAlertLevel;
   recommendedOrder: number;
-  urgency: 'OK' | 'LOW' | 'CRITICAL' | 'EMERGENCY';
+  urgency: StockAlertLevel;
 }
 
-interface StockAlert {
-  schoolId: string;
-  schoolName: string;
-  criticalItems: StockPrediction[];
-  lowItems: StockPrediction[];
-  timestamp: Date;
-}
-
-// ========================================
-// CÁLCULO DE CONSUMO MÉDIO
-// ========================================
-
-/**
- * Calcula o consumo médio diário de um item nos últimos 30 dias
- * 
- * Lógica:
- * 1. Buscar histórico de movimentações (últimos 30 dias)
- * 2. Somar todas as saídas (consumo)
- * 3. Dividir pelo número de dias
- * 
- * @param itemId - ID do item
- * @returns Consumo médio diário
- */
-async function calculateAvgDailyConsumption(itemId: string): Promise<number> {
-  // TODO: Implementar tabela de movimentações de estoque
-  // Por enquanto, vamos usar uma estimativa baseada na categoria
+export class StockPredictionService {
   
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-  });
-  
-  if (!item) return 0;
-  
-  // Estimativas por categoria (consumo diário médio por criança)
-  const consumptionByCategory: Record<InventoryCategory, number> = {
-    DIGNITY_CRITICAL: 5,  // 5 fraldas/dia por criança
-    HYGIENE: 2,           // 2 lenços/dia
-    FOOD: 0.5,            // 0.5kg alimento/dia
-    PEDAGOGICAL: 0.1,     // 0.1 material/dia
-    CLEANING: 0.05,       // 0.05 produto/dia
-    MEDICINE: 0.01,       // 0.01 medicamento/dia
-  };
-  
-  // Assumir 20 crianças por unidade (média)
-  const avgChildrenPerSchool = 20;
-  const dailyConsumption = consumptionByCategory[item.category] * avgChildrenPerSchool;
-  
-  return dailyConsumption;
-}
-
-/**
- * Calcula os dias restantes de estoque
- * 
- * @param currentQuantity - Quantidade atual
- * @param avgDailyConsumption - Consumo médio diário
- * @returns Dias restantes
- */
-function calculateDaysRemaining(currentQuantity: number, avgDailyConsumption: number): number {
-  if (avgDailyConsumption === 0) return 999; // Sem consumo = estoque infinito
-  return Math.floor(currentQuantity / avgDailyConsumption);
-}
-
-/**
- * Determina o nível de alerta baseado nos dias restantes
- * 
- * @param daysRemaining - Dias restantes
- * @param category - Categoria do item
- * @returns Nível de alerta
- */
-function determineAlertLevel(daysRemaining: number, category: InventoryCategory): StockAlertLevel {
-  // Itens críticos (DIGNITY_CRITICAL) têm limites mais rigorosos
-  if (category === 'DIGNITY_CRITICAL') {
-    if (daysRemaining < 1) return 'EMERGENCY';
-    if (daysRemaining < 3) return 'CRITICAL';
-    if (daysRemaining < 7) return 'LOW';
-    return 'OK';
-  }
-  
-  // Outros itens
-  if (daysRemaining < 2) return 'EMERGENCY';
-  if (daysRemaining < 5) return 'CRITICAL';
-  if (daysRemaining < 10) return 'LOW';
-  return 'OK';
-}
-
-/**
- * Calcula a quantidade recomendada para pedido
- * 
- * Lógica:
- * - Pedido deve cobrir 30 dias de consumo
- * - Subtrair quantidade atual
- * - Adicionar margem de segurança (20%)
- * 
- * @param avgDailyConsumption - Consumo médio diário
- * @param currentQuantity - Quantidade atual
- * @returns Quantidade recomendada
- */
-function calculateRecommendedOrder(avgDailyConsumption: number, currentQuantity: number): number {
-  const daysToStock = 30; // Estocar para 30 dias
-  const safetyMargin = 1.2; // Margem de 20%
-  
-  const targetQuantity = avgDailyConsumption * daysToStock * safetyMargin;
-  const orderQuantity = Math.max(0, targetQuantity - currentQuantity);
-  
-  return Math.ceil(orderQuantity);
-}
-
-// ========================================
-// ATUALIZAÇÃO DE PREVISÕES
-// ========================================
-
-/**
- * Atualiza a previsão de estoque de um item específico
- * 
- * @param itemId - ID do item
- * @returns Previsão atualizada
- */
-export async function updateItemPrediction(itemId: string): Promise<StockPrediction> {
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-  });
-  
-  if (!item) {
-    throw new Error(`Item ${itemId} não encontrado`);
-  }
-  
-  // Calcular métricas
-  const avgDailyConsumption = await calculateAvgDailyConsumption(itemId);
-  const daysRemaining = calculateDaysRemaining(item.quantity, avgDailyConsumption);
-  const alertLevel = determineAlertLevel(daysRemaining, item.category);
-  const recommendedOrder = calculateRecommendedOrder(avgDailyConsumption, item.quantity);
-  
-  // Atualizar no banco
-  const updatedItem = await prisma.inventoryItem.update({
-    where: { id: itemId },
-    data: {
-      avgDailyConsumption,
-      daysRemaining,
-      alertLevel,
-      lastUpdated: new Date(),
-    },
-  });
-  
-  return {
-    itemId: updatedItem.id,
-    itemName: updatedItem.name,
-    category: updatedItem.category,
-    currentQuantity: updatedItem.quantity,
-    avgDailyConsumption,
-    daysRemaining,
-    alertLevel,
-    recommendedOrder,
-    urgency: alertLevel,
-  };
-}
-
-/**
- * Atualiza as previsões de todos os itens de uma unidade
- * 
- * @param schoolId - ID da unidade
- * @returns Lista de previsões
- */
-export async function updateSchoolPredictions(schoolId: string): Promise<StockPrediction[]> {
-  const items = await prisma.inventoryItem.findMany({
-    where: { schoolId },
-  });
-  
-  const predictions: StockPrediction[] = [];
-  
-  for (const item of items) {
-    const prediction = await updateItemPrediction(item.id);
-    predictions.push(prediction);
-  }
-  
-  return predictions;
-}
-
-/**
- * Atualiza as previsões de TODAS as unidades da rede
- * 
- * @returns Mapa de previsões por unidade
- */
-export async function updateAllPredictions(): Promise<Map<string, StockPrediction[]>> {
-  const schools = await prisma.school.findMany();
-  const predictionsBySchool = new Map<string, StockPrediction[]>();
-  
-  for (const school of schools) {
-    const predictions = await updateSchoolPredictions(school.id);
-    predictionsBySchool.set(school.id, predictions);
-  }
-  
-  return predictionsBySchool;
-}
-
-// ========================================
-// ALERTAS E NOTIFICAÇÕES
-// ========================================
-
-/**
- * Busca itens com alerta crítico ou emergência
- * 
- * @param schoolId - ID da unidade (opcional, se não informado busca todas)
- * @returns Lista de alertas
- */
-export async function getCriticalAlerts(schoolId?: string): Promise<StockAlert[]> {
-  const schools = schoolId
-    ? await prisma.school.findMany({ where: { id: schoolId } })
-    : await prisma.school.findMany();
-  
-  const alerts: StockAlert[] = [];
-  
-  for (const school of schools) {
-    const criticalItems = await prisma.inventoryItem.findMany({
-      where: {
-        schoolId: school.id,
-        alertLevel: { in: ['CRITICAL', 'EMERGENCY'] },
-      },
+  /**
+   * Calculate stock predictions for a specific school
+   */
+  async predictStockNeeds(schoolId: string): Promise<StockPrediction[]> {
+    const items = await prisma.inventoryItem.findMany({
+      where: { schoolId }
     });
-    
-    const lowItems = await prisma.inventoryItem.findMany({
-      where: {
-        schoolId: school.id,
-        alertLevel: 'LOW',
-      },
+
+    const predictions: StockPrediction[] = items.map(item => {
+      // Calculate Days Remaining
+      // Avoid division by zero
+      const consumption = item.avgDailyConsumption > 0 
+        ? item.avgDailyConsumption 
+        : this.estimateConsumption(item);
+      
+      const daysRemaining = consumption > 0 
+        ? item.quantity / consumption 
+        : 999; // Infinite if no consumption
+
+      // Determine Alert Level
+      let alertLevel: StockAlertLevel = StockAlertLevel.NONE;
+      let urgency: StockAlertLevel = StockAlertLevel.OK;
+
+      if (daysRemaining <= ALERT_THRESHOLDS.CRITICAL) {
+        alertLevel = StockAlertLevel.CRITICAL;
+        urgency = StockAlertLevel.EMERGENCY;
+      } else if (daysRemaining <= ALERT_THRESHOLDS.LOW) {
+        alertLevel = StockAlertLevel.LOW;
+        urgency = StockAlertLevel.LOW; // Map LOW to LOW
+      }
+
+      // Calculate Recommended Order (to cover 30 days + safety stock)
+      const safetyStock = consumption * 5; // 5 days safety
+      const targetStock = consumption * 30; // 30 days coverage
+      const recommendedOrder = Math.max(0, targetStock + safetyStock - item.quantity);
+
+      return {
+        itemId: item.id,
+        itemName: item.name,
+        category: item.category,
+        currentQuantity: item.quantity,
+        avgDailyConsumption: consumption,
+        daysRemaining: Math.round(daysRemaining),
+        alertLevel,
+        recommendedOrder: Math.ceil(recommendedOrder),
+        urgency
+      };
     });
-    
-    if (criticalItems.length > 0 || lowItems.length > 0) {
-      alerts.push({
-        schoolId: school.id,
-        schoolName: school.name,
-        criticalItems: criticalItems.map(item => ({
-          itemId: item.id,
-          itemName: item.name,
-          category: item.category,
-          currentQuantity: item.quantity,
-          avgDailyConsumption: Number(item.avgDailyConsumption || 0),
-          daysRemaining: item.daysRemaining || 0,
-          alertLevel: item.alertLevel,
-          recommendedOrder: 0, // Calcular depois
-          urgency: item.alertLevel,
-        })),
-        lowItems: lowItems.map(item => ({
-          itemId: item.id,
-          itemName: item.name,
-          category: item.category,
-          currentQuantity: item.quantity,
-          avgDailyConsumption: Number(item.avgDailyConsumption || 0),
-          daysRemaining: item.daysRemaining || 0,
-          alertLevel: item.alertLevel,
-          recommendedOrder: 0,
-          urgency: item.alertLevel,
-        })),
-        timestamp: new Date(),
-      });
-    }
+
+    // Filter only items that need attention (Low or Critical)
+    return predictions.filter(p => p.alertLevel !== StockAlertLevel.NONE);
   }
-  
-  return alerts;
-}
 
-/**
- * Envia notificações para MATRIZ_ADMIN e UNIT_DIRECTOR
- * 
- * @param alerts - Lista de alertas
- */
-export async function sendStockAlerts(alerts: StockAlert[]): Promise<void> {
-  // TODO: Implementar envio de e-mail/SMS
-  
-  for (const alert of alerts) {
-    console.log(`
-🚨 ALERTA DE ESTOQUE - ${alert.schoolName}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  /**
+   * Recalculate average consumption based on actual logs
+   */
+  async recalculateConsumption(itemId: string): Promise<void> {
+    const logs = await prisma.consumptionLog.findMany({
+      where: { 
+        itemId,
+        date: {
+          gte: new Date(new Date().setDate(new Date().getDate() - 30)) // Last 30 days
+        }
+      }
+    });
 
-⚠️ ITENS CRÍTICOS (${alert.criticalItems.length}):
-${alert.criticalItems.map(item => 
-  `  • ${item.itemName}: ${item.currentQuantity} ${item.category} (${item.daysRemaining} dias restantes)`
-).join('\n')}
+    if (logs.length === 0) return;
 
-⚡ ITENS BAIXOS (${alert.lowItems.length}):
-${alert.lowItems.map(item => 
-  `  • ${item.itemName}: ${item.currentQuantity} ${item.category} (${item.daysRemaining} dias restantes)`
-).join('\n')}
+    const totalConsumed = logs.reduce((acc, log) => acc + log.quantity, 0);
+    const avg = totalConsumed / 30;
 
-Data: ${alert.timestamp.toLocaleString('pt-BR')}
-    `);
-    
-    // Marcar alerta como enviado
-    for (const item of [...alert.criticalItems, ...alert.lowItems]) {
-      await prisma.inventoryItem.update({
-        where: { id: item.itemId },
-        data: { lastAlertSent: new Date() },
-      });
-    }
+    await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: { 
+        avgDailyConsumption: avg,
+        lastUpdated: new Date()
+      }
+    });
+  }
+
+  /**
+   * Fallback estimation if no logs exist
+   */
+  private estimateConsumption(item: InventoryItem): number {
+    const factor = CONSUMPTION_PATTERNS[item.category] || 0.05;
+    // Estimate: 5% of total stock per day is a rough heuristic for active items
+    return item.quantity * factor; 
   }
 }
-
-// ========================================
-// DASHBOARD E RELATÓRIOS
-// ========================================
-
-/**
- * Gera dashboard de estoque para uma unidade
- * 
- * @param schoolId - ID da unidade
- * @returns Dashboard completo
- */
-export async function getStockDashboard(schoolId: string) {
-  const items = await prisma.inventoryItem.findMany({
-    where: { schoolId },
-    orderBy: { alertLevel: 'desc' },
-  });
-  
-  const summary = {
-    total: items.length,
-    ok: items.filter(i => i.alertLevel === 'OK').length,
-    low: items.filter(i => i.alertLevel === 'LOW').length,
-    critical: items.filter(i => i.alertLevel === 'CRITICAL').length,
-    emergency: items.filter(i => i.alertLevel === 'EMERGENCY').length,
-  };
-  
-  const byCategory = {
-    DIGNITY_CRITICAL: items.filter(i => i.category === 'DIGNITY_CRITICAL'),
-    HYGIENE: items.filter(i => i.category === 'HYGIENE'),
-    FOOD: items.filter(i => i.category === 'FOOD'),
-    PEDAGOGICAL: items.filter(i => i.category === 'PEDAGOGICAL'),
-    CLEANING: items.filter(i => i.category === 'CLEANING'),
-    MEDICINE: items.filter(i => i.category === 'MEDICINE'),
-  };
-  
-  return {
-    schoolId,
-    summary,
-    byCategory,
-    items,
-    lastUpdate: new Date(),
-  };
-}
-
-// ========================================
-// CRON JOB (Atualização Diária)
-// ========================================
-
-/**
- * Cron job diário: Atualiza previsões e envia alertas
- * 
- * Executar todos os dias às 2h da manhã:
- * 0 2 * * * node -e "require('./services/stock-prediction.service').dailyStockUpdate()"
- */
-export async function dailyStockUpdate(): Promise<void> {
-  console.log(`[ZELO] Iniciando atualização diária de estoque - ${new Date().toISOString()}`);
-  
-  try {
-    // 1. Atualizar previsões de todas as unidades
-    await updateAllPredictions();
-    console.log('[ZELO] ✅ Previsões atualizadas');
-    
-    // 2. Buscar alertas críticos
-    const alerts = await getCriticalAlerts();
-    console.log(`[ZELO] ⚠️ ${alerts.length} unidades com alertas`);
-    
-    // 3. Enviar notificações
-    if (alerts.length > 0) {
-      await sendStockAlerts(alerts);
-      console.log('[ZELO] 📧 Notificações enviadas');
-    }
-    
-    console.log('[ZELO] ✅ Atualização diária concluída');
-  } catch (error) {
-    console.error('[ZELO] ❌ Erro na atualização diária:', error);
-    throw error;
-  }
-}
-
-// ========================================
-// EXPORTAÇÕES
-// ========================================
-
-export default {
-  updateItemPrediction,
-  updateSchoolPredictions,
-  updateAllPredictions,
-  getCriticalAlerts,
-  sendStockAlerts,
-  getStockDashboard,
-  dailyStockUpdate,
-};
