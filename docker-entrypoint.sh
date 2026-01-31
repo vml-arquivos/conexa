@@ -63,26 +63,27 @@ echo "✅ Migrations executadas com sucesso!"
 # ========================================
 # 5. POPULAR DADOS INICIAIS (SEED)
 # ========================================
-echo "🌱 Verificando se precisa popular dados iniciais..."
-
-# Verificar se já existem usuários no banco
-USER_COUNT=$(npx prisma db execute --stdin <<EOF
-SELECT COUNT(*) FROM "User";
-EOF
-)
-
-if [ "$USER_COUNT" = "0" ]; then
-  echo "🌱 Banco vazio. Populando dados iniciais..."
-  npx prisma db seed
+if [ "$PRISMA_SEED_ENABLED" = "true" ]; then
+  echo "🌱 Verificando se precisa popular dados iniciais..."
   
-  if [ $? -ne 0 ]; then
-    echo "⚠️ AVISO: Falha ao popular dados iniciais (seed)"
-    echo "⚠️ O sistema continuará, mas você precisará criar usuários manualmente"
+  # Verificar se já existem usuários no banco
+  USER_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM \"User\"" 2>/dev/null || echo "0")
+  
+  if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
+    echo "🌱 Banco vazio. Populando dados iniciais..."
+    npx prisma db seed
+    
+    if [ $? -ne 0 ]; then
+      echo "⚠️ AVISO: Falha ao popular dados iniciais (seed)"
+      echo "⚠️ O sistema continuará, mas você precisará criar usuários manualmente"
+    else
+      echo "✅ Dados iniciais populados com sucesso!"
+    fi
   else
-    echo "✅ Dados iniciais populados com sucesso!"
+    echo "✅ Banco já possui dados ($USER_COUNT usuários). Pulando seed."
   fi
 else
-  echo "✅ Banco já possui dados. Pulando seed."
+  echo "⏭️ Seed desabilitado (PRISMA_SEED_ENABLED=false). Pulando..."
 fi
 
 # ========================================
