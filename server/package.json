@@ -4,6 +4,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "cd .. && npx prisma generate",
     "build": "npm run mkdir:uploads && tsc",
     "start": "npm run mkdir:uploads && node dist/src/index.js",
     "dev": "npm run mkdir:uploads && ts-node-dev src/index.ts",
