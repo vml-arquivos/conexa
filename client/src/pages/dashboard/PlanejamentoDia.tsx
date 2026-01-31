@@ -132,10 +132,15 @@ export default function PlanejamentoDia() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="p-4">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-blue-600" />
-            Planejamento do Dia
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-blue-600" />
+              Planejamento do Dia
+            </h1>
+            <div className="text-xs text-gray-500 font-medium">
+              Sistema <span className="font-bold bg-gradient-to-r from-blue-600 to-rose-600 bg-clip-text text-transparent">VALENTE</span>
+            </div>
+          </div>
           <p className="text-sm text-gray-600 mt-1">Acompanhe e registre as atividades</p>
         </div>
 
