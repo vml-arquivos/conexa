@@ -1,8 +1,6 @@
-// ========================================
-// SISTEMA VALENTE v1.0 (formerly CONEXA)
-// Schema Prisma Completo - Produção
-// "Conectando Vidas com Dignidade"
-// ========================================
+// ==========================================
+// PRISMA SCHEMA - CONEXA v1.0 (FINAL FIX)
+// ==========================================
 
 generator client {
   provider = "prisma-client-js"
@@ -13,59 +11,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ========================================
-// ENUMS
-// ========================================
+// ==========================================
+// ENUMS (Synchronized with TS Code)
+// ==========================================
 
-// ALIAS: Role mantido para compatibilidade, mas UserRole é o principal
 enum UserRole {
-  MATRIZ_ADMIN      // Poder total sobre todas as unidades
-  MATRIZ_COORD      // Coordenador da matriz
-  MATRIZ_NUTRI      // Nutricionista da rede (cardápios globais)
-  MATRIZ_PSYCHO     // Psicóloga (acesso a prontuários sigilosos)
-  UNIT_DIRECTOR     // Diretor da unidade (gestão local)
-  UNIT_COORD        // Coordenador da unidade
-  UNIT_SECRETARY    // Secretária (operacional)
-  UNIT_NUTRI        // Nutricionista da unidade
-  TEACHER           // Professor (acesso restrito à sua turma)
-  SUPPORT_STAFF     // Equipe de apoio
+  MATRIZ_ADMIN
+  MATRIZ_COORD
+  MATRIZ_NUTRI
+  MATRIZ_PSYCHO
+  UNIT_DIRECTOR
+  UNIT_COORD
+  UNIT_SECRETARY
+  UNIT_NUTRI
+  TEACHER
+  SUPPORT_STAFF
 }
 
 enum InventoryCategory {
-  FOOD              // Alimentos em geral
-  HYGIENE           // Produtos de higiene (fraldas, sabonete)
-  CLEANING          // Produtos de limpeza
-  PEDAGOGICAL       // Materiais pedagógicos
-  OFFICE            // Material de escritório
-  UTILITY           // Utilidades
-  MEDICINE          // Medicamentos básicos
-  DIGNITY_CRITICAL  // Itens críticos de dignidade
+  FOOD
+  HYGIENE
+  CLEANING
+  PEDAGOGICAL
+  OFFICE
+  UTILITY
+  MEDICINE
+  DIGNITY_CRITICAL
 }
 
 enum StockAlertLevel {
-  NONE              // Estoque normal
-  LOW               // Baixo (< 7 dias)
-  CRITICAL          // Crítico (< 3 dias)
-  EXCESS            // Excesso
-}
-
-enum FoodAcceptance {
-  NONE              // Recusou
-  PARTIAL           // Comeu parcialmente
-  FULL              // Comeu tudo
-}
-
-enum SleepQuality {
-  BOM               // Dormiu bem
-  AGITADO           // Sono agitado
-  NAO_DORMIU        // Não dormiu
-}
-
-enum Mood {
-  FELIZ             // Feliz
-  TRISTE            // Triste
-  AGITADO           // Agitado
-  CALMO             // Calmo
+  NONE
+  LOW
+  CRITICAL
+  EXCESS
+  OK        // Fix: Required by stock-prediction.service.ts
+  EMERGENCY // Fix: Required by stock-prediction.service.ts
 }
 
 enum DocumentType {
@@ -81,6 +61,7 @@ enum DocumentType {
 
 enum OrderStatus {
   DRAFT
+  PENDING          // Fix: Required by agent.ts
   PENDING_APPROVAL
   APPROVED
   REJECTED
@@ -89,199 +70,189 @@ enum OrderStatus {
   CANCELLED
 }
 
-// ========================================
-// 1. HIERARQUIA (RBAC) & MULTI-TENANCY
-// ========================================
+// ==========================================
+// MODELS
+// ==========================================
 
 model Association {
   id          String   @id @default(uuid())
-  name        String   // "Associação Beneficente Coração de Cristo"
-  cnpj        String   @unique
-  address     String
-  phone       String
-  email       String
-  
-  // Relacionamentos
+  name        String
+  cnpj        String?
+  address     String?
+  phone       String?
+  email       String?
   schools     School[]
-  menus       Menu[]   // Cardápios globais
-  
+  menus       Menu[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  @@map("associations")
 }
 
 model School {
-  id              String   @id @default(uuid())
-  name            String   // "CEPI Arara Canindé"
-  code            String   @unique // "CEPI-001"
-  address         String
-  phone           String
-  email           String
-  
-  // Relacionamento com Matriz
-  associationId   String
-  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  
-  // Relacionamentos
-  users           User[]
-  employees       Employee[]
-  classes         Class[]
-  students        Student[]
-  inventoryItems  InventoryItem[]
-  menus           Menu[]
-  consumptionLogs ConsumptionLog[]
+  id          String   @id @default(uuid())
+  name        String
+  address     String?
+  phone       String?
+  email       String?
+  associationId String
+  association Association @relation(fields: [associationId], references: [id])
+  users       User[]
+  classes     Class[]
+  inventory   InventoryItem[]
+  menus       Menu[]
+  auditLogs   AuditLog[]
   procurementOrders ProcurementOrder[]
-  auditLogs       AuditLog[]
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@map("schools")
+  employees   Employee[]
+  suppliers   Supplier[] // Fix: Relation to Supplier
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String   // Para compatibilidade com código existente
-  passwordHash  String?  // Hash bcrypt (migração gradual)
-  name          String
-  cpf           String?  @unique
-  phone         String?
-  role          UserRole
-  
-  // Multi-tenancy: Usuários de UNIDADE/TEACHER têm schoolId
-  schoolId      String?
-  school        School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  // TEACHER: Acesso restrito à turma
-  classId       String?
-  class         Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  
-  // Relacionamentos
-  psychologicalRecords PsychologicalRecord[]
-  auditLogs     AuditLog[]
-  
-  // Auditoria
-  lastLogin     DateTime?
-  isActive      Boolean  @default(true)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@map("users")
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        UserRole @default(TEACHER)
+  schoolId    String?
+  school      School?  @relation(fields: [schoolId], references: [id])
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  auditLogs   AuditLog[]
 }
-
-// ========================================
-// 2. GESTÃO DE PESSOAS (RH)
-// ========================================
 
 model Employee {
   id          String   @id @default(uuid())
   name        String
-  cpf         String?  @unique
+  cpf         String?
   email       String?
   phone       String?
   role        UserRole
-  
+  status      String   @default("ACTIVE") // Fix: TS Error
+  category    String?  // Fix: TS Error
   schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
+  school      School   @relation(fields: [schoolId], references: [id])
   documents   Document[]
-  
   hireDate    DateTime?
   active      Boolean  @default(true)
   salary      Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  name        String
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id])
+  year        Int      @default(2025)
+  capacity    Int?
+  teachers    User[]
+  students    Student[]
+  plannings   BNCCPlanning[]
+  // Fix: Field renamed to 'materialList' (singular) to match TS code expectation
+  materialList MaterialList[] 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  name        String
+  birthDate   DateTime
+  cpf         String?
+  email       String?  // Fix: TS Error
+  enrollmentId String?
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  
+  healthData  Json?
+  guardians   Json?
+  profileData Json?
+  
+  status      String   @default("ACTIVE")
+  
+  dailyLogs   DailyLog[]
+  psychRecords PsychologicalRecord[]
+  documents   Document[]
+  attendance  Attendance[] // Fix: TS Error
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  @@map("employees")
+}
+
+// Fix: Missing Model for Student Attendance
+model Attendance {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  date      DateTime
+  present   Boolean
+  createdAt DateTime @default(now())
 }
 
 model Document {
   id          String       @id @default(uuid())
   title       String
+  filename    String?      // Fix: TS Error
   type        DocumentType
   url         String
   fileKey     String?
   
   studentId   String?
-  student     Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     Student?     @relation(fields: [studentId], references: [id])
   
   employeeId  String?
-  employee    Employee?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee    Employee?    @relation(fields: [employeeId], references: [id])
   
   expiryDate  DateTime?
   verified    Boolean      @default(false)
   
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  
-  @@map("documents")
 }
 
-// ========================================
-// 3. MÓDULO "ZELO" (ESTOQUE & NUTRIÇÃO)
-// ========================================
-
 model InventoryItem {
-  id                    String              @id @default(uuid())
-  name                  String              // "Fralda P"
-  sku                   String?             // Código SKU
-  category              InventoryCategory
-  quantity              Float               // Quantidade atual
-  unit                  String              // "unidade", "kg", "litro"
-  minThreshold          Float               // Alerta quando < minThreshold
+  id                  String            @id @default(uuid())
+  name                String
+  sku                 String?
+  category            InventoryCategory
+  quantity            Float
+  unit                String
+  minThreshold        Float
+  avgDailyConsumption Float             @default(0)
+  daysRemaining       Float             @default(0)
+  lastPrice           Float?
   
-  // Previsão de estoque (Zelo AI)
-  avgDailyConsumption   Float               @default(0)
-  daysRemaining         Float               @default(0)
-  alertLevel            StockAlertLevel     @default(NONE)
-  lastAlertSent         DateTime?
-  lastPrice             Float?
-  lastUpdated           DateTime?
+  alertLevel          StockAlertLevel   @default(NONE)
+  lastAlertSent       DateTime?
+  lastUpdated         DateTime?
   
-  // Multi-tenancy
-  schoolId              String
-  school                School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId            String
+  school              School            @relation(fields: [schoolId], references: [id])
   
-  // Relacionamentos
-  consumptionLogs       ConsumptionLog[]
+  consumptionLogs     ConsumptionLog[]
   
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  
-  @@map("inventory_items")
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 }
 
 model ConsumptionLog {
   id          String        @id @default(uuid())
-  quantity    Float         // Quantidade consumida
-  reason      String?       // Motivo (opcional)
-  userId      String?       // Quem registrou
-  
-  // Relacionamentos
   itemId      String
-  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  
-  schoolId    String
-  school      School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  classId     String?
-  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
-  
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  quantity    Float
+  reason      String?
   date        DateTime      @default(now())
-  createdAt   DateTime      @default(now())
-  
-  @@map("consumption_logs")
+  userId      String?
 }
 
 model ProcurementOrder {
   id          String      @id @default(uuid())
+  orderNumber String?     // Fix: TS Error
   schoolId    String
-  school      School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school      School      @relation(fields: [schoolId], references: [id])
   status      OrderStatus @default(DRAFT)
   totalValue  Float?
   
@@ -292,21 +263,17 @@ model ProcurementOrder {
   
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  
-  @@map("procurement_orders")
 }
 
 model ProcurementOrderItem {
   id          String           @id @default(uuid())
   orderId     String
-  order       ProcurementOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       ProcurementOrder @relation(fields: [orderId], references: [id])
   name        String
   quantity    Float
   unitPrice   Float?
   totalPrice  Float?
   sku         String?
-  
-  @@map("procurement_order_items")
 }
 
 model Supplier {
@@ -315,267 +282,111 @@ model Supplier {
   cnpj        String?
   email       String?
   phone       String?
+  website     String?           // Fix: TS Error
+  
+  schoolId    String?           // Fix: TS Error (optional relation to school)
+  school      School?           @relation(fields: [schoolId], references: [id])
+
   products    SupplierProduct[]
   priceLists  SupplierPriceList[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  
-  @@map("suppliers")
 }
 
 model SupplierProduct {
   id          String   @id @default(uuid())
   supplierId  String
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
   name        String
   sku         String?
   price       Float
   unit        String
+  category    String?  // Fix: TS Error
   updatedAt   DateTime @updatedAt
-  
-  @@map("supplier_products")
 }
 
 model SupplierPriceList {
   id          String   @id @default(uuid())
   supplierId  String
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
   name        String
   validUntil  DateTime?
   fileUrl     String?
+  xmlData     String?  // Fix: TS Error
   createdAt   DateTime @default(now())
-  
-  @@map("supplier_price_lists")
-}
-
-model Menu {
-  id              String       @id @default(uuid())
-  name            String       // "Cardápio Semana 1"
-  title           String?      // Título alternativo
-  weekNumber      Int?         // Número da semana
-  year            Int?
-  date            DateTime?    // Data específica
-  
-  // JSON com estrutura:
-  // {
-  //   "monday": { "breakfast": "...", "lunch": "...", "snack": "..." },
-  //   "tuesday": { ... }
-  // }
-  meals           Json?
-  items           Json?        // Formato alternativo
-  
-  // Cardápio global (MATRIZ) ou local (SCHOOL)
-  associationId   String?
-  association     Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  
-  schoolId        String?
-  school          School?      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  
-  @@map("menus")
-}
-
-// ========================================
-// 4. MÓDULO "SUPER PEDAGOGO" & IA
-// ========================================
-
-model Class {
-  id              String   @id @default(uuid())
-  name            String   // "Berçário 1"
-  level           String?  // "0-1 anos", "2-3 anos", "4 anos"
-  year            Int      @default(2025)
-  capacity        Int?     // Capacidade máxima
-  
-  // Multi-tenancy
-  schoolId        String
-  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  // Relacionamentos
-  students        Student[]
-  teachers        User[]   // Professores
-  dailyLogs       DailyLog[]
-  bnccPlannings   BNCCPlanning[]
-  consumptionLogs ConsumptionLog[]
-  materialLists   MaterialList[]
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@map("classes")
-}
-
-model Student {
-  id                      String                  @id @default(uuid())
-  name                    String
-  birthDate               DateTime
-  cpf                     String?                 @unique
-  enrollmentId            String?
-  
-  // Dados de saúde (JSON)
-  // { "allergies": ["lactose", "gluten"], "medications": ["..."] }
-  healthData              Json?
-  
-  // Responsáveis (JSON)
-  // [{ "name": "...", "phone": "...", "relationship": "mãe" }]
-  guardians               Json?
-  
-  // Dados de perfil adicionais
-  profileData             Json?
-  
-  // Multi-tenancy
-  schoolId                String
-  school                  School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  classId                 String
-  class                   Class                   @relation(fields: [classId], references: [id], onDelete: Cascade)
-  
-  // Relacionamentos
-  dailyLogs               DailyLog[]
-  psychologicalRecords    PsychologicalRecord[]
-  documents               Document[]
-  
-  status                  String                  @default("ACTIVE") // ACTIVE, INACTIVE, TRANSFERRED
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  
-  @@map("students")
-}
-
-model DailyLog {
-  id              String          @id @default(uuid())
-  date            DateTime        @default(now())
-  
-  // Alimentação
-  breakfast       FoodAcceptance?
-  morningSnack    FoodAcceptance?
-  lunch           FoodAcceptance?
-  afternoonSnack  FoodAcceptance?
-  foodAcceptance  String?         // Formato alternativo
-  
-  // Sono
-  slept           Boolean?
-  sleep           Boolean?        // Alias
-  sleepDuration   Int?            // Minutos
-  sleepTime       String?         // Formato texto
-  sleepQuality    SleepQuality?
-  
-  // Higiene
-  diaperChanges   Int?            // Número de trocas
-  bathed          Boolean?
-  teethBrushed    Boolean?
-  
-  // Evacuação
-  evacuation      String?         // "NORMAL", "DIARREIA", "CONSTIPACAO", "NAO_HOUVE"
-  
-  // Humor e Comportamento
-  mood            Mood?
-  behavior        String?         // Texto livre
-  
-  // Observações
-  observations    String?
-  notes           String?         // Alias
-  
-  // Alertas gerados pela IA (JSON)
-  alerts          Json?
-  
-  // Relacionamentos
-  studentId       String
-  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
-  classId         String
-  class           Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  
-  @@map("daily_logs")
-}
-
-model PsychologicalRecord {
-  id              String   @id @default(uuid())
-  date            DateTime @default(now())
-  observation     String   @db.Text
-  isConfidential  Boolean  @default(true)
-  tags            String[] @default([])
-  
-  // Relacionamentos
-  studentId       String
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
-  psychologistId  String
-  psychologist    User     @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@map("psychological_records")
-}
-
-model BNCCPlanning {
-  id          String   @id @default(uuid())
-  date        DateTime
-  title       String
-  theme       String?
-  description String?  @db.Text
-  activities  String?  @db.Text
-  
-  // Códigos BNCC (Array de strings)
-  // Ex: ["EI02TS01", "EI02EF01"]
-  bnccCodes   String[]
-  
-  // Materiais necessários (JSON)
-  // [{ "name": "Papel A4", "quantity": 20 }]
-  materials   Json?
-  resources   String?
-  
-  // Duração (minutos)
-  duration    Int?
-  
-  // Gerado por IA
-  aiGenerated Boolean  @default(false)
-  aiContext   String?  @db.Text
-  
-  // Relacionamentos
-  classId     String
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("bncc_plannings")
 }
 
 model MaterialList {
   id          String             @id @default(uuid())
   classId     String
-  class       Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class       Class              @relation(fields: [classId], references: [id])
+  schoolId    String?            // Fix: TS Error
   name        String
   items       MaterialListItem[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
-  
-  @@map("material_lists")
 }
 
 model MaterialListItem {
   id             String       @id @default(uuid())
   listId         String
-  materialList   MaterialList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  materialList   MaterialList @relation(fields: [listId], references: [id])
   name           String
+  category       String?      // Fix: TS Error
   quantity       Float
   unit           String
   purchased      Boolean      @default(false)
-  
-  @@map("material_list_items")
 }
 
-// ========================================
-// 5. AUDITORIA & COMPLIANCE
-// ========================================
+model Menu {
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  items       Json
+  schoolId    String?
+  school      School?  @relation(fields: [schoolId], references: [id])
+  associationId String?
+  association Association? @relation(fields: [associationId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model DailyLog {
+  id             String   @id @default(uuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  date           DateTime @default(now())
+  sleep          Boolean  @default(false)
+  sleepTime      String?
+  foodAcceptance String
+  evacuation     String?
+  notes          String?
+  createdAt      DateTime @default(now())
+}
+
+model PsychologicalRecord {
+  id             String   @id @default(uuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  psychologistId String
+  observation    String   @db.Text
+  isConfidential Boolean  @default(true)
+  tags           String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model BNCCPlanning {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  date        DateTime
+  theme       String
+  bnccCodes   String[]
+  activities  String   @db.Text
+  resources   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 model AuditLog {
   id          String   @id @default(uuid())
@@ -583,10 +394,8 @@ model AuditLog {
   resource    String
   details     String?
   userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user        User?    @relation(fields: [userId], references: [id])
   schoolId    String?
-  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school      School?  @relation(fields: [schoolId], references: [id])
   createdAt   DateTime @default(now())
-  
-  @@map("audit_logs")
 }
