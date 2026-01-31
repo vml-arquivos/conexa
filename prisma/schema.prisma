@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String    @id @default(uuid())
+  name      String
+  planType  String    @default("PRO")
+  
+  students     Student[]
+  employees    Employee[]
+  inventory    InventoryItem[]
+  classes      Class[]
+  suppliers    Supplier[]
+  materialLists MaterialList[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// ========== TURMAS ==========
+model Class {
+  id          String   @id @default(uuid())
+  name        String   // "5º Ano A", "Maternal 1"
+  level       String   // "Berçário", "Maternal", "Fundamental", "Médio"
+  year        Int      // 2024, 2025
+  
+  students    Student[]
+  materialList MaterialList?
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== ALUNOS ==========
+model Student {
+  id          String   @id @default(uuid())
+  name        String
+  birthDate   DateTime?
+  email       String?
+  phone       String?
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, EVADED, ARCHIVED
+  
+  // Responsável
+  responsavelName String?
+  responsavelEmail String?
+  responsavelPhone String?
+  
+  // DADOS FLEXÍVEIS
+  healthData  Json?    // { alergias, medicamentos, tea, etc }
+  academicData Json?   // { notas, historico, etc }
+  attendance   Json?   // { faltasConsecutivas, total, etc }
+  
+  documents   Document[]
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== FUNCIONÁRIOS ==========
+model Employee {
+  id          String   @id @default(uuid())
+  name        String
+  category    String   // "Diretor", "Coordenador", "Professor", "Limpeza", "Cozinha", "Nutricionista"
+  email       String?
+  phone       String?
+  cpf         String?  @unique
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, ARCHIVED
+  
+  // Informações profissionais
+  hireDate    DateTime?
+  salary      Decimal?
+  department  String?  // "Administrativo", "Pedagógico", "Operacional"
+  
+  // DADOS FLEXÍVEIS
+  personalData Json?   // { endereco, cidade, estado, etc }
+  
+  documents   Document[]
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== DOCUMENTOS ==========
+model Document {
+  id          String   @id @default(uuid())
+  type        String   // RG, CONTRATO, FOTO, VACINA, DIPLOMA, CERTIFICADO, ATESTADO
+  url         String   // Caminho do arquivo
+  filename    String
+  fileSize    Int?     // Tamanho em bytes
+  mimeType    String?  // application/pdf, image/jpeg
+  expiryDate  DateTime? // Data de vencimento (se aplicável)
+  
+  studentId   String?
+  student     Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== ESTOQUE ==========
+model InventoryItem {
+  id           String   @id @default(uuid())
+  name         String
+  category     String   // HIGIENE, PEDAGOGICO, ALIMENTACAO
+  quantity     Int      @default(0)
+  minThreshold Int      @default(10)
+  unit         String   @default("un")
+  
+  // Campos de Compras
+  sku          String?
+  lastPrice    Decimal? @default(0.0)
+  supplier     String?
+  lastUpdated  DateTime @default(now())
+  
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ========== LISTAS DE MATERIAIS POR TURMA ==========
+model MaterialList {
+  id          String   @id @default(uuid())
+  classId     String   @unique
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  items       MaterialListItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MaterialListItem {
+  id            String   @id @default(uuid())
+  name          String
+  category      String   // HIGIENE, PEDAGOGICO, ALIMENTACAO
+  quantity      Int
+  unit          String   @default("un")
+  description   String?
+  
+  listId        String
+  list          MaterialList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+}
+
+// ========== FORNECEDORES ==========
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  website     String?
+  
+  // Endereço
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  
+  // Contato
+  contactPerson String?
+  contactEmail  String?
+  contactPhone  String?
+  
+  products    SupplierProduct[]
+  priceList   SupplierPriceList[]
+  
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== PRODUTOS DO FORNECEDOR ==========
+model SupplierProduct {
+  id          String   @id @default(uuid())
+  sku         String
+  name        String
+  category    String   // HIGIENE, PEDAGOGICO, ALIMENTACAO
+  price       Decimal
+  unit        String   @default("un")
+  description String?
+  
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([supplierId, sku])
+}
+
+// ========== TABELA DE PREÇOS DO FORNECEDOR ==========
+model SupplierPriceList {
+  id          String   @id @default(uuid())
+  name        String   // "Tabela 2025", "Promoção Jan"
+  xmlUrl      String?  // URL do arquivo XML
+  xmlData     Json?    // Dados parseados do XML
+  
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  validFrom   DateTime
+  validUntil  DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ========== PEDIDOS DE COMPRA ==========
+model ProcurementOrder {
+  id          String   @id @default(uuid())
+  orderNumber String   @unique
+  status      String   @default("DRAFT") // DRAFT, PENDING, APPROVED, COMPLETED, CANCELLED
+  
+  // Origem
+  classId     String?  // Se for por turma
+  schoolId    String
+  
+  // Fornecedor
+  supplierId  String?
+  supplierName String?
+  
+  items       ProcurementItem[]
+  totalValue  Decimal  @default(0.0)
+  
+  // Observações
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProcurementItem {
+  id          String   @id @default(uuid())
+  sku         String?
+  itemName    String
+  category    String?
+  quantity    Int
+  unitPrice   Decimal
+  subtotal    Decimal
+  unit        String   @default("un")
+  
+  orderId     String
+  order       ProcurementOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}

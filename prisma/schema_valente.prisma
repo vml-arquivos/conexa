@@ -1,0 +1,470 @@
+// ========================================
+// SISTEMA VALENTE v1.0 - Schema Prisma
+// ERP Educacional para Rede CoCris
+// Foco: Dignidade Humana, Proteção à Criança, Automatização
+// ========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// RBAC & MULTI-TENANCY (PHASE 1)
+// ========================================
+
+enum UserRole {
+  // NÍVEL 1: MATRIZ (Poder total)
+  MATRIZ_ADMIN      // Cria unidades, vê tudo
+  MATRIZ_COORD      // Coordenação pedagógica geral
+  MATRIZ_NUTRI      // Nutricionista da rede
+  MATRIZ_PSYCHO     // Psicóloga (acesso a prontuários sigilosos)
+  
+  // NÍVEL 2: UNIDADE (Gestão local)
+  UNIT_DIRECTOR     // Diretor da unidade
+  UNIT_SECRETARY    // Secretária (matrículas, atestados)
+  
+  // NÍVEL 3: SALA DE AULA (Visão restrita)
+  TEACHER           // Professor (acesso apenas à sua turma)
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  role          UserRole
+  
+  // Multi-tenancy: NULL para MATRIZ, obrigatório para UNIT/TEACHER
+  schoolId      String?
+  school        School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  // Restrição de turma (apenas para TEACHER)
+  classId       String?
+  class         Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  
+  // Logs de auditoria
+  lastLogin     DateTime?
+  isActive      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relações
+  dailyLogs           DailyLog[]
+  psychologicalRecords PsychologicalRecord[]
+  inventoryRequests   InventoryRequest[]
+  bnccPlannings       BNCCPlanning[]
+  
+  @@index([schoolId])
+  @@index([role])
+}
+
+// ========================================
+// ESTRUTURA ORGANIZACIONAL
+// ========================================
+
+model School {
+  id          String    @id @default(uuid())
+  name        String    // "CEPI Arara Canindé", "Creche CoCris"
+  code        String    @unique // "ARARA", "COCRIS_SEDE"
+  address     String?
+  phone       String?
+  email       String?
+  
+  // Capacidade e informações
+  capacity    Int?      // Número máximo de crianças
+  ageRange    String?   // "0-4 anos"
+  
+  // Status
+  isActive    Boolean   @default(true)
+  
+  // Relações
+  users       User[]
+  classes     Class[]
+  students    Student[]
+  inventory   InventoryItem[]
+  suppliers   Supplier[]
+  dailyLogs   DailyLog[]
+  psychologicalRecords PsychologicalRecord[]
+  inventoryRequests InventoryRequest[]
+  bnccPlannings BNCCPlanning[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Class {
+  id          String    @id @default(uuid())
+  name        String    // "Berçário 1", "Maternal 2"
+  level       String    // "Berçário", "Maternal", "Pré-escola"
+  ageGroup    String    // "0-1 anos", "2-3 anos", "4 anos"
+  year        Int       // 2026
+  
+  // Capacidade
+  capacity    Int       @default(20)
+  currentSize Int       @default(0)
+  
+  // Horário
+  shift       String?   // "Matutino", "Vespertino", "Integral"
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  // Relações
+  students    Student[]
+  teachers    User[]
+  dailyLogs   DailyLog[]
+  bnccPlannings BNCCPlanning[]
+  inventoryRequests InventoryRequest[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+}
+
+// ========================================
+// CRIANÇAS E RESPONSÁVEIS
+// ========================================
+
+model Student {
+  id          String    @id @default(uuid())
+  name        String
+  birthDate   DateTime
+  gender      String?   // "M", "F", "Outro"
+  cpf         String?   @unique
+  
+  // Saúde e Desenvolvimento
+  bloodType   String?   // "A+", "O-", etc
+  allergies   String[]  // ["Leite", "Glúten"]
+  medications String[]  // ["Ritalina 10mg"]
+  specialNeeds String?  // TEA, TDAH, etc
+  
+  // Responsáveis
+  responsible1Name  String
+  responsible1Phone String
+  responsible1Email String?
+  responsible1Relation String // "Mãe", "Pai", "Avó"
+  
+  responsible2Name  String?
+  responsible2Phone String?
+  responsible2Email String?
+  responsible2Relation String?
+  
+  // Endereço
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  
+  // Status
+  status      String    @default("ACTIVE") // ACTIVE, INACTIVE, TRANSFERRED, GRADUATED
+  enrollmentDate DateTime @default(now())
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  classId     String?
+  class       Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  
+  // Relações
+  dailyLogs   DailyLog[]
+  psychologicalRecords PsychologicalRecord[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([classId])
+  @@index([status])
+}
+
+// ========================================
+// DIÁRIO DE BORDO (REGISTRO DIÁRIO)
+// ========================================
+
+model DailyLog {
+  id          String    @id @default(uuid())
+  date        DateTime  @default(now())
+  
+  // Criança
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Turma
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  // Professor responsável
+  teacherId   String
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  
+  // REGISTROS RÁPIDOS (Dignidade)
+  // Alimentação
+  breakfast   String?   // "Comeu tudo", "Comeu metade", "Recusou"
+  lunch       String?   // "Comeu tudo", "Comeu metade", "Recusou"
+  snackAM     String?   // "Comeu tudo", "Comeu metade", "Recusou"
+  snackPM     String?   // "Comeu tudo", "Comeu metade", "Recusou"
+  
+  // Sono
+  napDuration Int?      // Minutos de sono
+  napQuality  String?   // "Tranquilo", "Agitado", "Não dormiu"
+  
+  // Higiene
+  diaperChanges Int     @default(0) // Número de trocas de fralda
+  bathed      Boolean   @default(false)
+  toothBrushed Boolean  @default(false)
+  
+  // Evacuação
+  bowelMovement String? // "Normal", "Diarreia", "Constipação", "Não evacuou"
+  
+  // Humor e Comportamento
+  mood        String?   // "Feliz", "Choroso", "Irritado", "Apático"
+  behavior    String?   // "Participativo", "Isolado", "Agressivo"
+  
+  // Observações gerais
+  observations String?  // Texto livre para o professor
+  
+  // Alertas automáticos (gerados pelo sistema)
+  alerts      String[]  // ["Recusou alimentação 3x seguidas", "Sono irregular"]
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([studentId, date]) // Uma entrada por criança por dia
+  @@index([schoolId])
+  @@index([classId])
+  @@index([date])
+}
+
+// ========================================
+// PRONTUÁRIO PSICOLÓGICO (SIGILOSO)
+// ========================================
+
+model PsychologicalRecord {
+  id          String    @id @default(uuid())
+  date        DateTime  @default(now())
+  
+  // Criança
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Psicóloga responsável (apenas MATRIZ_PSYCHO)
+  psychologistId String
+  psychologist   User    @relation(fields: [psychologistId], references: [id])
+  
+  // Tipo de atendimento
+  sessionType String    // "Avaliação inicial", "Acompanhamento", "Encaminhamento"
+  
+  // Conteúdo sigiloso
+  observations String   // Texto livre
+  diagnosis   String?   // Diagnóstico ou suspeita
+  recommendations String? // Recomendações para família/escola
+  
+  // Anexos (URLs de documentos)
+  attachments String[]
+  
+  // Visibilidade restrita
+  isConfidential Boolean @default(true)
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+// ========================================
+// GESTÃO DE INSUMOS (MÓDULO ZELO)
+// ========================================
+
+enum InventoryCategory {
+  DIGNITY_CRITICAL  // Fraldas, Leite, Água
+  HYGIENE           // Sabonete, Papel higiênico
+  FOOD              // Alimentos em geral
+  PEDAGOGICAL       // Materiais pedagógicos
+  CLEANING          // Produtos de limpeza
+  MEDICINE          // Medicamentos básicos
+}
+
+model InventoryItem {
+  id          String    @id @default(uuid())
+  name        String    // "Fralda M", "Leite em pó"
+  category    InventoryCategory
+  
+  // Estoque
+  currentStock Int      @default(0)
+  minStock    Int       @default(10) // Alerta quando atingir
+  unit        String    // "unidade", "litro", "kg"
+  
+  // Consumo médio (calculado automaticamente)
+  avgDailyConsumption Decimal? // Média de consumo por dia
+  
+  // Previsão de fim de estoque (calculado)
+  estimatedDaysLeft Int?
+  
+  // Alertas
+  isLowStock  Boolean   @default(false)
+  isCritical  Boolean   @default(false) // < 3 dias para acabar
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  // Relações
+  requests    InventoryRequest[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([category])
+  @@index([isLowStock])
+  @@index([isCritical])
+}
+
+model InventoryRequest {
+  id          String    @id @default(uuid())
+  
+  // Item solicitado
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  
+  // Quantidade
+  quantity    Int
+  urgency     String    @default("NORMAL") // NORMAL, URGENT, CRITICAL
+  
+  // Solicitante
+  requestedBy String
+  requester   User      @relation(fields: [requestedBy], references: [id])
+  
+  // Turma (se aplicável)
+  classId     String?
+  class       Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  
+  // Status
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED, DELIVERED
+  
+  // Justificativa
+  reason      String?
+  
+  // Aprovação (UNIT_DIRECTOR ou MATRIZ_ADMIN)
+  approvedBy  String?
+  approvedAt  DateTime?
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([status])
+  @@index([urgency])
+}
+
+// ========================================
+// FORNECEDORES
+// ========================================
+
+model Supplier {
+  id          String    @id @default(uuid())
+  name        String
+  cnpj        String?   @unique
+  category    String    // "Alimentos", "Higiene", "Pedagógico"
+  
+  // Contato
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  
+  // Avaliação
+  rating      Decimal?  // 0-5 estrelas
+  isPreferred Boolean   @default(false)
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+}
+
+// ========================================
+// PLANEJAMENTO PEDAGÓGICO (BNCC)
+// ========================================
+
+model BNCCPlanning {
+  id          String    @id @default(uuid())
+  date        DateTime  // Data do planejamento
+  
+  // Turma
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  // Professor responsável
+  teacherId   String
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  
+  // Campo de Experiência BNCC
+  bnccField   String    // "O eu, o outro e o nós", etc
+  bnccCode    String    // "CE01", "CE02", etc
+  
+  // Atividade planejada
+  activityTitle String
+  activityDescription String
+  objectives  String[]  // Lista de objetivos de aprendizagem
+  
+  // Materiais necessários
+  materials   String[]  // ["Papel", "Tinta", "Pincel"]
+  
+  // Tempo estimado
+  duration    Int?      // Minutos
+  
+  // Execução
+  wasExecuted Boolean   @default(false)
+  executionNotes String? // Observações pós-execução
+  
+  // Sugestão de IA (Módulo Super Pedagogo)
+  aiSuggested Boolean   @default(false)
+  aiPrompt    String?   // Prompt usado para gerar a atividade
+  
+  // Multi-tenancy
+  schoolId    String
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([classId])
+  @@index([date])
+}
+
+// ========================================
+// ÍNDICES E OTIMIZAÇÕES
+// ========================================
+
+// Todos os modelos principais têm:
+// - @@index([schoolId]) para multi-tenancy
+// - Timestamps (createdAt, updatedAt)
+// - Soft delete quando necessário (isActive)
