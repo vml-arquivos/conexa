@@ -43,16 +43,15 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copiar código fonte
 COPY . .
 
-# Gerar Prisma Client no contexto raiz (Fix: Pin to v5.22.0 to avoid breaking changes in v7+)
-RUN npm install -g prisma@5.22.0
-WORKDIR /app
-RUN npx prisma generate
-
 # Compilar TypeScript do servidor (CRITICAL: Install dependencies FIRST)
 WORKDIR /app/server
 RUN pnpm install
 
-# Compilar TypeScript (Now Prisma Client types are available)
+# Gerar Prisma Client no contexto do servidor (Fix: Pin to v5.22.0 to avoid breaking changes in v7+)
+RUN npm install -g prisma@5.22.0
+RUN cd .. && npx prisma generate
+
+# Compilar TypeScript (Now Prisma Client types are available in /app/server/node_modules)
 RUN pnpm run build
 WORKDIR /app
 
