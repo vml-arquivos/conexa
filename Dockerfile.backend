@@ -42,7 +42,8 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copiar código fonte
 COPY . .
 
-# Gerar Prisma Client
+# Gerar Prisma Client (Fix: Pin to v5.22.0 to avoid breaking changes in v7+)
+RUN npm install -g prisma@5.22.0
 RUN npx prisma generate
 
 # ========================================
