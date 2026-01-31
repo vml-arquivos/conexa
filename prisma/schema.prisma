@@ -1,5 +1,5 @@
 // ==========================================
-// PRISMA SCHEMA - CONEXA v1.0 (FINAL FIX)
+// PRISMA SCHEMA - CONEXA (FINAL PRODUCTION)
 // ==========================================
 
 generator client {
@@ -12,7 +12,7 @@ datasource db {
 }
 
 // ==========================================
-// ENUMS (Synchronized with TS Code)
+// ENUMS
 // ==========================================
 
 enum UserRole {
@@ -44,8 +44,8 @@ enum StockAlertLevel {
   LOW
   CRITICAL
   EXCESS
-  OK        // Fix: Required by stock-prediction.service.ts
-  EMERGENCY // Fix: Required by stock-prediction.service.ts
+  OK
+  EMERGENCY
 }
 
 enum DocumentType {
@@ -61,7 +61,7 @@ enum DocumentType {
 
 enum OrderStatus {
   DRAFT
-  PENDING          // Fix: Required by agent.ts
+  PENDING
   PENDING_APPROVAL
   APPROVED
   REJECTED
@@ -102,7 +102,8 @@ model School {
   auditLogs   AuditLog[]
   procurementOrders ProcurementOrder[]
   employees   Employee[]
-  suppliers   Supplier[] // Fix: Relation to Supplier
+  suppliers   Supplier[]
+  students    Student[] // Relation to Student
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -113,6 +114,7 @@ model User {
   email       String   @unique
   password    String
   role        UserRole @default(TEACHER)
+  isActive    Boolean  @default(true) // Fix: Required by rbac.middleware.ts
   schoolId    String?
   school      School?  @relation(fields: [schoolId], references: [id])
   classId     String?
@@ -129,8 +131,9 @@ model Employee {
   email       String?
   phone       String?
   role        UserRole
-  status      String   @default("ACTIVE") // Fix: TS Error
-  category    String?  // Fix: TS Error
+  status      String   @default("ACTIVE")
+  department  String?  // Fix: Required by employees-advanced.ts
+  category    String?
   schoolId    String
   school      School   @relation(fields: [schoolId], references: [id])
   documents   Document[]
@@ -144,6 +147,7 @@ model Employee {
 model Class {
   id          String   @id @default(uuid())
   name        String
+  level       String?  // Fix: Required by material-orders.ts
   schoolId    String
   school      School   @relation(fields: [schoolId], references: [id])
   year        Int      @default(2025)
@@ -151,8 +155,8 @@ model Class {
   teachers    User[]
   students    Student[]
   plannings   BNCCPlanning[]
-  // Fix: Field renamed to 'materialList' (singular) to match TS code expectation
-  materialList MaterialList[] 
+  materialList MaterialList[]
+  procurementOrders ProcurementOrder[] // Relation to ProcurementOrder
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -162,8 +166,12 @@ model Student {
   name        String
   birthDate   DateTime
   cpf         String?
-  email       String?  // Fix: TS Error
+  email       String?
   enrollmentId String?
+  
+  schoolId    String?  // Fix: Required by agent.ts
+  school      School?  @relation(fields: [schoolId], references: [id])
+  
   classId     String
   class       Class    @relation(fields: [classId], references: [id])
   
@@ -176,13 +184,12 @@ model Student {
   dailyLogs   DailyLog[]
   psychRecords PsychologicalRecord[]
   documents   Document[]
-  attendance  Attendance[] // Fix: TS Error
+  attendance  Attendance[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// Fix: Missing Model for Student Attendance
 model Attendance {
   id        String   @id @default(uuid())
   studentId String
@@ -195,7 +202,8 @@ model Attendance {
 model Document {
   id          String       @id @default(uuid())
   title       String
-  filename    String?      // Fix: TS Error
+  filename    String?
+  fileSize    Int?         // Fix: Required by documents.ts
   type        DocumentType
   url         String
   fileKey     String?
@@ -250,9 +258,13 @@ model ConsumptionLog {
 
 model ProcurementOrder {
   id          String      @id @default(uuid())
-  orderNumber String?     // Fix: TS Error
+  orderNumber String?
   schoolId    String
   school      School      @relation(fields: [schoolId], references: [id])
+  
+  classId     String?     // Fix: Required by material-orders.ts
+  class       Class?      @relation(fields: [classId], references: [id])
+
   status      OrderStatus @default(DRAFT)
   totalValue  Float?
   
@@ -282,9 +294,10 @@ model Supplier {
   cnpj        String?
   email       String?
   phone       String?
-  website     String?           // Fix: TS Error
+  address     String?           // Fix: Required by material-orders.ts
+  website     String?
   
-  schoolId    String?           // Fix: TS Error (optional relation to school)
+  schoolId    String?
   school      School?           @relation(fields: [schoolId], references: [id])
 
   products    SupplierProduct[]
@@ -301,8 +314,11 @@ model SupplierProduct {
   sku         String?
   price       Float
   unit        String
-  category    String?  // Fix: TS Error
+  category    String?
   updatedAt   DateTime @updatedAt
+  
+  // Compound unique constraint to fix "supplierId_sku" error
+  @@unique([supplierId, sku]) 
 }
 
 model SupplierPriceList {
@@ -310,17 +326,18 @@ model SupplierPriceList {
   supplierId  String
   supplier    Supplier @relation(fields: [supplierId], references: [id])
   name        String
+  validFrom   DateTime? // Fix: Required by material-orders.ts
   validUntil  DateTime?
   fileUrl     String?
-  xmlData     String?  // Fix: TS Error
+  xmlData     String?
   createdAt   DateTime @default(now())
 }
 
 model MaterialList {
   id          String             @id @default(uuid())
-  classId     String
+  classId     String             @unique // Fix: Added unique constraint for findUnique query
   class       Class              @relation(fields: [classId], references: [id])
-  schoolId    String?            // Fix: TS Error
+  schoolId    String?
   name        String
   items       MaterialListItem[]
   createdAt   DateTime           @default(now())
@@ -332,7 +349,8 @@ model MaterialListItem {
   listId         String
   materialList   MaterialList @relation(fields: [listId], references: [id])
   name           String
-  category       String?      // Fix: TS Error
+  description    String?      // Fix: Required by material-orders.ts
+  category       String?
   quantity       Float
   unit           String
   purchased      Boolean      @default(false)
