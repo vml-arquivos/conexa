@@ -91,8 +91,7 @@ router.post('/', async (req: Request, res: Response) => {
         schoolId,
         hireDate: hireDate ? new Date(hireDate) : null,
         salary: salary ? parseFloat(salary) : null,
-        department,
-        personalData: personalData || {}
+        department
       },
       include: { documents: true }
     });
@@ -121,8 +120,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         ...(status && { status }),
         ...(hireDate && { hireDate: new Date(hireDate) }),
         ...(salary !== undefined && { salary: salary ? parseFloat(salary) : null }),
-        ...(department && { department }),
-        ...(personalData && { personalData })
+        ...(department && { department })
       },
       include: { documents: true }
     });
@@ -199,7 +197,6 @@ router.post('/:id/documents', upload.single('file'), async (req: Request, res: R
         url: `/uploads/employees/${newFilename}`,
         filename: req.file.originalname,
         fileSize: req.file.size,
-        mimeType: req.file.mimetype,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         employeeId: id
       }

@@ -56,7 +56,7 @@ router.post('/import', upload.single('file'), async (req: Request, res: Response
                   category: row.categoria || 'PEDAGOGICO', 
                   quantity: 0, 
                   lastPrice: parseFloat(row.preco) || 0,
-                  schoolId: 'default-school-id'
+                  schoolId: row.schoolId || 'default-school-id'
                 }
               });
               created++;

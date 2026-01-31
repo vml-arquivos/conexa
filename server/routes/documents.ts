@@ -27,7 +27,6 @@ router.post('/upload', uploadSingle, async (req: Request, res: Response) => {
         filename: req.file.originalname,
         url: `/uploads/${req.file.filename}`,
         fileSize: req.file.size,
-        mimeType: req.file.mimetype,
         studentId: studentId || null,
         employeeId: employeeId || null,
       },

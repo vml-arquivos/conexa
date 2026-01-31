@@ -178,7 +178,7 @@ router.get('/suppliers', async (req: Request, res: Response) => {
       where: { schoolId: schoolId as string },
       include: {
         products: true,
-        priceList: true
+        priceLists: true
       },
       orderBy: { name: 'asc' }
     });
@@ -205,7 +205,6 @@ router.post('/suppliers', async (req: Request, res: Response) => {
         phone,
         website,
         address,
-        city,
         state,
         zipCode,
         contactPerson,
@@ -351,7 +350,6 @@ router.post('/orders', async (req: Request, res: Response) => {
         orderNumber,
         classId: classId || null,
         schoolId,
-        supplierId: supplierId || null,
         supplierName: supplierName || 'Não especificado',
         status: 'DRAFT',
         totalValue,

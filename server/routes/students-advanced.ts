@@ -99,8 +99,7 @@ router.post('/', async (req: Request, res: Response) => {
         responsavelEmail,
         responsavelPhone,
         healthData: healthData || {},
-        academicData: academicData || {},
-        attendance: { faltasConsecutivas: 0, total: 0 }
+        academicData: academicData || {}
       },
       include: { documents: true, class: true }
     });
@@ -213,7 +212,6 @@ router.post('/:id/documents', upload.single('file'), async (req: Request, res: R
         url: `/uploads/students/${newFilename}`,
         filename: req.file.originalname,
         fileSize: req.file.size,
-        mimeType: req.file.mimetype,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         studentId: id
       }
