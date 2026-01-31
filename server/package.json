@@ -4,7 +4,6 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "prebuild": "cd .. && npx prisma generate",
     "build": "npm run mkdir:uploads && tsc",
     "start": "npm run mkdir:uploads && node dist/src/index.js",
     "dev": "npm run mkdir:uploads && ts-node-dev src/index.ts",
@@ -19,7 +18,7 @@
     "seed": "ts-node --project ./tsconfig.json ../prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "5.22.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^16.0.0",
@@ -39,7 +38,7 @@
     "@types/node": "^20.0.0",
     "@types/pdfkit": "^0.13.4",
     "@types/xml2js": "^0.4.11",
-    "prisma": "^5.22.0",
+    "prisma": "5.22.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"
