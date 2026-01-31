@@ -138,7 +138,7 @@ export default function PlanejamentoDia() {
               Planejamento do Dia
             </h1>
             <div className="text-xs text-gray-500 font-medium">
-              Sistema <span className="font-bold bg-gradient-to-r from-blue-600 to-rose-600 bg-clip-text text-transparent">VALENTE</span>
+              Sistema <span className="font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">CONEXA</span>
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-1">Acompanhe e registre as atividades</p>
