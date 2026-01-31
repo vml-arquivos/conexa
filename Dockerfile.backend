@@ -30,7 +30,7 @@ COPY patches ./patches/
 COPY prisma ./prisma/
 
 # Instalar dependências com pnpm
-RRUN pnpm install --prod &&     pnpm store prunee
+RUN pnpm install --prod && pnpm store prune
 
 # ========================================
 # STAGE 3: Build
