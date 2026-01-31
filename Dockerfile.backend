@@ -33,23 +33,17 @@ RUN pnpm install --frozen-lockfile && \
 # ========================================
 FROM build-deps AS build
 
+# Copiar todo o código
 COPY . .
 
+# CRÍTICO: Gerar Prisma Client na raiz (onde está o schema)
 RUN npx prisma generate
 
+# Instalar dependências do server
 WORKDIR /app/server
-# CRÍTICO: Gerar Prisma Client ANTES de compilar TypeScript
-RUN npx prisma generate
-
-WORKDIR /app/server
-
-# Garantir que as dependências do server estejam instaladas
 RUN pnpm install --no-frozen-lockfile
 
-# CRÍTICO: Gerar Prisma Client NOVAMENTE no contexto do server
-RUN cd /app && npx prisma generate
-
-# Agora compilar TypeScript com tipos corretos
+# Compilar TypeScript (agora com Prisma Client disponível)
 RUN pnpm run build
 
 # ========================================
