@@ -9,19 +9,13 @@ set -e
 echo "🚀 CONEXA - Iniciando Backend..."
 
 # ========================================
-# 1. INSTALAR DEPENDÊNCIAS
-# ========================================
-echo "📦 Instalando dependências..."
-npm install --production
-
-# ========================================
-# 2. GERAR PRISMA CLIENT
+# 1. GERAR PRISMA CLIENT (usando versão correta do pnpm)
 # ========================================
 echo "🔧 Gerando Prisma Client..."
-npx prisma generate
+pnpm exec prisma generate
 
 # ========================================
-# 3. AGUARDAR POSTGRES ESTAR PRONTO
+# 2. AGUARDAR POSTGRES ESTAR PRONTO
 # ========================================
 echo "⏳ Aguardando PostgreSQL estar pronto..."
 
@@ -48,10 +42,10 @@ fi
 echo "✅ PostgreSQL está pronto!"
 
 # ========================================
-# 4. EXECUTAR MIGRATIONS
+# 3. EXECUTAR MIGRATIONS
 # ========================================
 echo "🗄️ Executando migrations..."
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 
 if [ $? -ne 0 ]; then
   echo "❌ ERRO: Falha ao executar migrations"
@@ -61,7 +55,7 @@ fi
 echo "✅ Migrations executadas com sucesso!"
 
 # ========================================
-# 5. POPULAR DADOS INICIAIS (SEED)
+# 4. POPULAR DADOS INICIAIS (SEED)
 # ========================================
 if [ "$PRISMA_SEED_ENABLED" = "true" ]; then
   echo "🌱 Verificando se precisa popular dados iniciais..."
@@ -71,7 +65,7 @@ if [ "$PRISMA_SEED_ENABLED" = "true" ]; then
   
   if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
     echo "🌱 Banco vazio. Populando dados iniciais..."
-    npx prisma db seed
+    pnpm exec prisma db seed
     
     if [ $? -ne 0 ]; then
       echo "⚠️ AVISO: Falha ao popular dados iniciais (seed)"
@@ -87,7 +81,7 @@ else
 fi
 
 # ========================================
-# 6. INICIAR SERVIDOR
+# 5. INICIAR SERVIDOR
 # ========================================
 echo "🚀 Iniciando servidor API..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -96,4 +90,5 @@ echo "  \"Conectando Vidas\""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-exec npm start
+cd /app/server
+exec node dist/src/index.js

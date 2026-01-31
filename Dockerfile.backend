@@ -36,8 +36,8 @@ FROM build-deps AS build
 # Copiar todo o código
 COPY . .
 
-# CRÍTICO: Gerar Prisma Client na raiz (onde está o schema)
-RUN npx prisma generate
+# CRÍTICO: Gerar Prisma Client na raiz (onde está o schema) usando versão correta
+RUN pnpm exec prisma generate
 
 # Instalar dependências do server
 WORKDIR /app/server
