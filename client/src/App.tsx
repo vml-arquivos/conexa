@@ -18,6 +18,10 @@ import TarefasList from "./pages/dashboard/TarefasList";
 import NovaTarefa from "./pages/dashboard/NovaTarefa";
 import CorrecaoTarefa from "./pages/dashboard/CorrecaoTarefa";
 
+// Admin Pages - CRM 360º
+import ClientManagement from "./pages/admin/ClientManagement";
+import FinancialDashboard from "./pages/admin/FinancialDashboard";
+
 function Router() {
   return (
     <Switch>
@@ -77,6 +81,49 @@ function Router() {
       <Route path="/dashboard/tarefas/:id/correcao">
         <DashboardLayout>
           <CorrecaoTarefa />
+        </DashboardLayout>
+      </Route>
+      
+      {/* ==========================================
+          ADMIN ROUTES - CRM 360º & FINANCEIRO
+          ========================================== */}
+      
+      {/* Gestão de Clientes/Alunos - CRM 360º */}
+      <Route path="/admin/clients">
+        <DashboardLayout>
+          <ClientManagement />
+        </DashboardLayout>
+      </Route>
+      <Route path="/admin/clientes">
+        <DashboardLayout>
+          <ClientManagement />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/clientes">
+        <DashboardLayout>
+          <ClientManagement />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/alunos">
+        <DashboardLayout>
+          <ClientManagement />
+        </DashboardLayout>
+      </Route>
+      
+      {/* Painel Financeiro Inteligente */}
+      <Route path="/admin/financeiro">
+        <DashboardLayout>
+          <FinancialDashboard />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/financeiro">
+        <DashboardLayout>
+          <FinancialDashboard />
+        </DashboardLayout>
+      </Route>
+      <Route path="/admin/financial">
+        <DashboardLayout>
+          <FinancialDashboard />
         </DashboardLayout>
       </Route>
       

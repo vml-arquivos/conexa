@@ -9,6 +9,8 @@ import documentRoutes from '../routes/documents.js';
 import procurementRoutes from '../routes/procurement.js';
 import materialOrderRoutes from '../routes/material-orders.js';
 import studentRoutes from '../routes/students-advanced.js';
+import financeRoutes from '../routes/finance.js';
+import n8nRoutes from '../routes/n8n-conversas.js';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -20,10 +22,17 @@ app.use(morgan('dev'));
 // Servir arquivos estáticos de uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// Rota de Saude
+// ==========================================
+// ROTAS DE SAÚDE
+// ==========================================
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', system: 'CONEXA v1.0', timestamp: new Date() });
+  res.json({ status: 'OK', system: 'CONEXA v1.1', timestamp: new Date() });
 });
+
+// ==========================================
+// ROTAS PRINCIPAIS
+// ==========================================
 
 // Rotas do Agente de IA
 app.use('/api/agent', agentRoutes);
@@ -43,10 +52,30 @@ app.use('/api/students', studentRoutes);
 // Rotas de Pedidos por Turma
 app.use('/api/material-orders', materialOrderRoutes);
 
-// Rota de Alunos
+// ==========================================
+// NOVAS ROTAS - CRM 360º & FINANCEIRO
+// ==========================================
+
+// Rotas Financeiras (Painel Inteligente)
+app.use('/api/finance', financeRoutes);
+
+// Rotas de Integração N8N/WhatsApp
+app.use('/api/n8n', n8nRoutes);
+
+// ==========================================
+// ROTAS LEGADAS (Compatibilidade)
+// ==========================================
+
+// Rota de Alunos (legado)
 app.get('/api/students', async (req, res) => {
   try {
-    const students = await prisma.student.findMany();
+    const students = await prisma.student.findMany({
+      include: {
+        class: true,
+        school: true,
+        documents: true
+      }
+    });
     res.json(students);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar alunos' });
@@ -91,11 +120,21 @@ app.put('/api/inventory/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// INICIALIZAÇÃO DO SERVIDOR
+// ==========================================
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 CONEXA Server rodando na porta ${PORT}`);
-  console.log(`🤖 Agente de IA disponivel em /api/agent`);
-  console.log(`📄 Documentos disponivel em /api/documents`);
-  console.log(`👥 Funcionários disponivel em /api/employees`);
-  console.log(`📦 Compras disponivel em /api/procurement`);
+  console.log(`🚀 CONEXA Server v1.1 rodando na porta ${PORT}`);
+  console.log(`📊 Endpoints disponíveis:`);
+  console.log(`   - /api/health          (Health Check)`);
+  console.log(`   - /api/agent           (Agente de IA)`);
+  console.log(`   - /api/students        (Alunos)`);
+  console.log(`   - /api/employees       (Funcionários)`);
+  console.log(`   - /api/documents       (Documentos)`);
+  console.log(`   - /api/procurement     (Compras)`);
+  console.log(`   - /api/material-orders (Pedidos)`);
+  console.log(`   - /api/finance         (Financeiro) [NEW]`);
+  console.log(`   - /api/n8n             (WhatsApp/N8N) [NEW]`);
 });
