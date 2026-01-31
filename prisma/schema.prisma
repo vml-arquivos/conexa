@@ -373,23 +373,3 @@ model BNCCPlanning {
   @@map("bncc_plannings")
 }
 
-// ========================================
-// ÍNDICES PARA PERFORMANCE
-// ========================================
-
-// Índices para buscas frequentes
-@@index([schoolId], map: "idx_users_school")
-@@index([role], map: "idx_users_role")
-@@index([email], map: "idx_users_email")
-
-@@index([schoolId], map: "idx_students_school")
-@@index([classId], map: "idx_students_class")
-@@index([status], map: "idx_students_status")
-
-@@index([studentId, date], map: "idx_dailylogs_student_date")
-@@index([classId, date], map: "idx_dailylogs_class_date")
-
-@@index([schoolId, category], map: "idx_inventory_school_category")
-@@index([alertLevel], map: "idx_inventory_alert")
-
-@@index([classId, date], map: "idx_bncc_class_date")
