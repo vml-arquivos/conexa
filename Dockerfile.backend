@@ -38,6 +38,8 @@ COPY . .
 RUN npx prisma generate
 
 WORKDIR /app/server
+# Fix: Force install dependencies (including devDependencies like typescript) in the server scope
+RUN pnpm install --no-frozen-lockfile
 RUN pnpm run build
 
 # ========================================
