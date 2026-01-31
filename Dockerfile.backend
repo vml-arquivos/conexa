@@ -30,8 +30,7 @@ COPY patches ./patches/
 COPY prisma ./prisma/
 
 # Instalar dependências com pnpm
-RUN pnpm install --prod --frozen-lockfile && \
-    pnpm store prune
+RRUN pnpm install --prod &&     pnpm store prunee
 
 # ========================================
 # STAGE 3: Build
