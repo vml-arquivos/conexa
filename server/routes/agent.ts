@@ -19,10 +19,12 @@ router.post('/command', async (req: Request, res: Response) => {
     switch (action) {
       // ========== ALUNOS ==========
       case 'REGISTER_STUDENT':
-        // Payload: { name, turma, responsavel, schoolId }
+        // Payload: { name, turma, responsavel, schoolId, birthDate, classId }
         result = await prisma.student.create({
           data: {
             name: payload.name,
+            birthDate: payload.birthDate ? new Date(payload.birthDate) : new Date('2020-01-01'),
+            classId: payload.classId || payload.turma || 'default-class',
             schoolId: payload.schoolId || 'default-school',
             profileData: { 
               responsavel: payload.responsavel, 
@@ -241,7 +243,7 @@ router.get('/commands', (req: Request, res: Response) => {
       {
         action: 'REGISTER_STUDENT',
         description: 'Registrar novo aluno',
-        payload: { name: 'string', turma: 'string', responsavel: 'string', schoolId: 'string' }
+        payload: { name: 'string', birthDate: 'string', classId: 'string', turma: 'string', responsavel: 'string', schoolId: 'string' }
       },
       {
         action: 'UPDATE_STUDENT',
