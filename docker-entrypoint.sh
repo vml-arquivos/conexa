@@ -60,8 +60,15 @@ echo "✅ Migrations executadas com sucesso!"
 if [ "$PRISMA_SEED_ENABLED" = "true" ]; then
   echo "🌱 Verificando se precisa popular dados iniciais..."
   
-  # Verificar se já existem usuários no banco
-  USER_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM \"User\"" 2>/dev/null || echo "0")
+  # Verificar se já existem usuários no banco usando Node.js
+  USER_COUNT=$(node -e "
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    prisma.user.count()
+      .then(count => { console.log(count); process.exit(0); })
+      .catch(() => { console.log('0'); process.exit(0); })
+      .finally(() => prisma.\$disconnect());
+  " 2>/dev/null || echo "0")
   
   if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
     echo "🌱 Banco vazio. Populando dados iniciais..."
